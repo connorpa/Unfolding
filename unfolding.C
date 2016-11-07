@@ -172,7 +172,7 @@ void make_RM (TH2 * h_RM,
                 pt_rec = minpt + r.Rndm()*(maxpt-minpt);
                 x = (pt_gen-pt_rec)/pt_gen;
                 if (x < minresolution)
-                    continue; // to mimick core sampling
+                    continue; // to mimick core sampling TODO?
                 else if (x > maxresolution) // this should normally never happen if maxresolution is correctly set to 1
                     throw TString::Format("pt_gen=%f && pt_rec=%f => x=%f", pt_gen, pt_rec, x);
                 weight *= f_resolution->Eval(x);
@@ -615,8 +615,8 @@ int main (int argc, char* argv[])
     vector<double> triggers; for (unsigned short i = 0 ; i <= 0 ; i++) triggers.push_back(i*  10);
     
     map<TString, double (*)(double)> MC_spectra = {{"flat spectrum", flat_spectrum},
-        {"#frac{1}{p_{T}^{4}}", falling_spectrum},
-        {"#frac{1}{p_{T}^{6}}", even_more_falling_spectrum}};
+                                                   {"#frac{1}{p_{T}^{4}}", falling_spectrum},
+                                                   {"#frac{1}{p_{T}^{6}}", even_more_falling_spectrum}};
 
     // open PDF files for the different samplings
     for (const TString& sampling: vsampling)
@@ -642,7 +642,7 @@ int main (int argc, char* argv[])
         {
             cout << "================================================================================"
                  << "\nParameters:"
-                 << "\n\tminSP = " << minSP 
+                 << "\n\tmin stability & purity = " << minSP 
                  << "\n\tmu = " << mu
                  << "\n\tsigma = " << sigma 
                  << "\n\tnevents = " << nevents << endl;
@@ -680,6 +680,7 @@ int main (int argc, char* argv[])
                     make_RM(h_RM, h_resolution, MC_spectrum.second, minpt, maxpt, f_resolution, nevents, sampling);
 
                     cout << "=== Rebinning" << endl;
+                    //vector<double> new_edges = std_binning;
                     vector<double> new_edges = find_binning(h_RM, minSP, minSP);
 
                     int nbins = new_edges.size()-1;
@@ -714,10 +715,10 @@ int main (int argc, char* argv[])
 
     // ending
     f->Close();
-    //if (batch)
+    if (gROOT->IsBatch())
         rootapp->Terminate();
-    //else
-    //    rootapp->Run();
+    else
+        rootapp->Run();
     return EXIT_SUCCESS;
 }
 
