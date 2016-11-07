@@ -1,24 +1,3 @@
-/********************************************************************************
- * UNFOLDING                                                                    *
- *                                                                              *
- * The aim of the program is to play with RooUnfold and                         *
- * the different unfolding methods                                              *
- * under different conditions, including binning, resolution, etc.              *
- * but NOT to unfold your data!                                                 *
- *                                                                              *
- * How to use it?                                                               *
- *  - make sure to use Root6                                                    *
- *  - download the latest RooUnfold and compile it                              *
- *  - adapt the makefile                                                        *
- *  - browse through the TODOs and adapt the code according to your needs       *
- *  - make it and run it!                                                       *
- *                                                                              *
- * To download RooUnfold:                                                       *
- * > svn co https://svnsrv.desy.de/public/unfolding/RooUnfold/trunk RooUnfold   *
- *                                                                              *
- * Contact: Patrick L.S. Connor (patrick.connor@desy.de)                        *
- ********************************************************************************/
-
 #include <map>
 #include <vector>
 #include <cstdlib>
