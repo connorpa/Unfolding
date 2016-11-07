@@ -1,3 +1,6 @@
+#include <cmath>
+using namespace std;
+
 double Resolution (double *x, double *p)
 {
     static const double sqrtLn4 = 1.17741002251547466;
@@ -38,6 +41,7 @@ double Resolution (double *x, double *p)
         return N * exp(  pow(z(kR),2)/2 - z(kR)*z(aR) ) * pow(-nR/z(kR),nR) * pow(z(aR) - nR/z(kR) - z(X), -nR) ;
 }
 
+#ifdef CLANG
 TF1 * resolution ()
 {
     TCanvas * c = new TCanvas ("c", "");
@@ -75,3 +79,4 @@ TF1 * resolution ()
 
     return CB_tail;
 }
+#endif

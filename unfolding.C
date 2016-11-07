@@ -31,6 +31,8 @@
 
 using namespace std;
 
+double Resolution (double *, double *);
+
 TCanvas * divider (const vector<TString> lines, Color_t fillcolor = kGray)
 {
     TCanvas * c = new TCanvas("divider", "Unfolding");
@@ -68,53 +70,43 @@ double even_more_falling_spectrum(double pt)
 
 //double resolution (double *x, double *p)
 //{
-//    // TODO: add tails to and deviations from gaussian core
-//    double mu = p[0],
-//           sigma = p[1];
-//    if (sigma > 0)
-//        return exp(-pow((*x-mu)/sigma,2)/2);
+//    static const double sqrtLn4 = 1.17741002251547466;
+//    double X = x[0];
+//    double N = p[0],
+//           mu = p[1],
+//           sigma = p[2],
+//           tau = p[3], // Novosibirsk argument
+//           kL = p[4],
+//           kR = p[5],
+//           aL = p[6],
+//           nL = p[7],
+//           aR = p[8],
+//           nR = p[9];
+//    if (sigma <= 0) return N;
+//    bool kNovosibirsk = (tau >= 1e-7);
+//
+//    auto z = [&kNovosibirsk,&mu,&sigma,&tau](double x)
+//    {    
+//        if (kNovosibirsk)
+//        {
+//            const double Lambda = asinh( tau * sqrtLn4 ) / ( sigma*tau*sqrtLn4 );
+//            return sqrt(pow( log(1+Lambda*tau*(x-mu))/tau ,2) + pow(tau,2));
+//        }
+//        else
+//            return (x-mu)/sigma;
+//    };   
+//
+//    if (X <= aL)
+//        return N * exp(  pow(z(kL),2)/2 - z(kL)*z(aL) ) * pow(-nL/z(kL),nL) * pow(z(aL) - nL/z(kL) - z(X), -nL) ;
+//    else if (X <= kL)
+//        return N * exp(  pow(z(kL),2)/2 - z(kL)*z( X) );
+//    else if (X <= kR)
+//        return N * exp( -pow(z( X),2)/2 );
+//    else if (X <= aR)
+//        return N * exp(  pow(z(kR),2)/2 - z(kR)*z( X) );
 //    else
-//        return (*x == mu) ? 1. : 0.;
+//        return N * exp(  pow(z(kR),2)/2 - z(kR)*z(aR) ) * pow(-nR/z(kR),nR) * pow(z(aR) - nR/z(kR) - z(X), -nR) ;
 //}
-double resolution (double *x, double *p)
-{
-    static const double sqrtLn4 = 1.17741002251547466;
-    double X = x[0];
-    double N = p[0],
-           mu = p[1],
-           sigma = p[2],
-           tau = p[3], // Novosibirsk argument
-           kL = p[4],
-           kR = p[5],
-           aL = p[6],
-           nL = p[7],
-           aR = p[8],
-           nR = p[9];
-    if (sigma <= 0) return N;
-    bool kNovosibirsk = (tau >= 1e-7);
-
-    auto z = [&kNovosibirsk,&mu,&sigma,&tau](double x)
-    {    
-        if (kNovosibirsk)
-        {
-            const double Lambda = asinh( tau * sqrtLn4 ) / ( sigma*tau*sqrtLn4 );
-            return sqrt(pow( log(1+Lambda*tau*(x-mu))/tau ,2) + pow(tau,2));
-        }
-        else
-            return (x-mu)/sigma;
-    };   
-
-    if (X <= aL)
-        return N * exp(  pow(z(kL),2)/2 - z(kL)*z(aL) ) * pow(-nL/z(kL),nL) * pow(z(aL) - nL/z(kL) - z(X), -nL) ;
-    else if (X <= kL)
-        return N * exp(  pow(z(kL),2)/2 - z(kL)*z( X) );
-    else if (X <= kR)
-        return N * exp( -pow(z( X),2)/2 );
-    else if (X <= aR)
-        return N * exp(  pow(z(kR),2)/2 - z(kR)*z( X) );
-    else
-        return N * exp(  pow(z(kR),2)/2 - z(kR)*z(aR) ) * pow(-nR/z(kR),nR) * pow(z(aR) - nR/z(kR) - z(X), -nR) ;
-}
 
 void make_RM (TH2 * h_RM,
               TH2 * h_resolution,
@@ -667,7 +659,7 @@ int main (int argc, char* argv[])
             f->mkdir(dirname)->cd();
 
             cout << "=== Defining resolution function (used only if sigma different from 0)" << endl;
-            TF1 * f_resolution = new TF1 ("resolution", resolution, -1, 1, 2);
+            TF1 * f_resolution = new TF1 ("resolution", Resolution, -1, 1, 2);
             f_resolution->SetParameters(N, mu, sigma, tau, kL, kR, aL, nL, aR, nR);
 
             cout << "=== Defining gen and rec histograms" << endl;
