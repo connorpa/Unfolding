@@ -41,7 +41,7 @@ double Resolution (double *x, double *p)
         return N * exp(  pow(z(kR),2)/2 - z(kR)*z(aR) ) * pow(-nR/z(kR),nR) * pow(z(aR) - nR/z(kR) - z(X), -nR) ;
 }
 
-#ifdef CLANG
+#ifdef __CLING__
 TF1 * resolution ()
 {
     TCanvas * c = new TCanvas ("c", "");
