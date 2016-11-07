@@ -38,17 +38,17 @@
 #include <TLatex.h>
 #include <TColor.h>
 #include <TStyle.h>
-// RooUnfold TODO: change the path to the headers
-#include "/home/connorpa/Libraries/RooUnfold/src/RooUnfold.h"
-#include "/home/connorpa/Libraries/RooUnfold/src/RooUnfoldBinByBin.h"
-#include "/home/connorpa/Libraries/RooUnfold/src/RooUnfoldErrors.h"
-#include "/home/connorpa/Libraries/RooUnfold/src/RooUnfoldParms.h"
-#include "/home/connorpa/Libraries/RooUnfold/src/RooUnfoldSvd.h"
-#include "/home/connorpa/Libraries/RooUnfold/src/RooUnfoldBayes.h"
-#include "/home/connorpa/Libraries/RooUnfold/src/RooUnfoldDagostini.h"
-#include "/home/connorpa/Libraries/RooUnfold/src/RooUnfoldInvert.h"
-#include "/home/connorpa/Libraries/RooUnfold/src/RooUnfoldResponse.h"
-#include "/home/connorpa/Libraries/RooUnfold/src/RooUnfoldTUnfold.h"
+// RooUnfold
+#include <RooUnfold.h>
+#include <RooUnfoldBinByBin.h>
+#include <RooUnfoldErrors.h>
+#include <RooUnfoldParms.h>
+#include <RooUnfoldSvd.h>
+#include <RooUnfoldBayes.h>
+#include <RooUnfoldDagostini.h>
+#include <RooUnfoldInvert.h>
+#include <RooUnfoldResponse.h>
+#include <RooUnfoldTUnfold.h>
 
 using namespace std;
 
