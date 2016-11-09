@@ -600,13 +600,14 @@ int main (int argc, char* argv[])
     TFile * f = new TFile ("unfolding.root", "RECREATE");
 
     // parameters TODO
-    const unsigned long nevents = 5e6;
+    const unsigned long nevents = 1e7;
     vector<TString> vsampling = {"perfect", "uniform", "core"};
-    double N = 1, tau = 0 /* TODO check nonzero tau -> seg */, kL = -0.3, kR = 0.3, aL = -1, nL = 3, aR = 0.3, nR = 6; // TODO: play with this
+    double N = 1, tau = 0 /* TODO check nonzero tau -> seg */, kL = -1, kR = 1, aL = -1, nL = 1, aR = 1, nR = 1; // TODO: play with this
+    // my guess: the resolution is fundamentally gaussian, every deviation comes from a bad matching --> to be studied
     vector<double> vmu     ; for (unsigned short i = 0 ; i <= 0 ; i++) vmu     .push_back(i*0.01);
-    vector<double> vsigma  ; for (unsigned short i = 2 ; i <= 2 ; i++) vsigma  .push_back(i*0.02);
-    vector<double> vminSP  ; for (unsigned short i = 6 ; i <= 6 ; i++) vminSP  .push_back(i*0.10);
-    vector<double> triggers; for (unsigned short i = 0 ; i <= 0 ; i++) triggers.push_back(i*  10);
+    vector<double> vsigma  ; for (unsigned short i = 1 ; i <= 2 ; i++) vsigma  .push_back(i*0.02);
+    vector<double> vminSP  ; for (unsigned short i = 6 ; i <= 9 ; i++) vminSP  .push_back(i*0.10);
+    vector<double> triggers; for (unsigned short i = 0 ; i <= 5 ; i++) triggers.push_back(i*  10);
     
     map<TString, double (*)(double)> MC_spectra = {{"flat spectrum", flat_spectrum},
                                                    {"#frac{1}{p_{T}^{4}}", falling_spectrum},
@@ -640,7 +641,7 @@ int main (int argc, char* argv[])
                  << "\n\tnevents = " << nevents << endl;
             vector<TString> parameterisation = {TString::Format("#minSP=%f",minSP), TString::Format("#mu=%f",mu), TString::Format("#sigma=%f", sigma)};
 
-            TString dirname = MC_spectrum.first + "_" + TString::Format("_minSP%f_mu%f_sigma%f", minSP, mu, sigma);
+            TString dirname = MC_spectrum.first + "_" + TString::Format("_trigger%f_minSP%f_mu%f_sigma%f", trigger, minSP, mu, sigma);
             dirname.ReplaceAll(".", "p");
             dirname.ReplaceAll(" ", "_");
             dirname.ReplaceAll("-", "_");
