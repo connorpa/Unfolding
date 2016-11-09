@@ -68,46 +68,6 @@ double even_more_falling_spectrum(double pt)
     return pow(pt,-6);
 }
 
-//double resolution (double *x, double *p)
-//{
-//    static const double sqrtLn4 = 1.17741002251547466;
-//    double X = x[0];
-//    double N = p[0],
-//           mu = p[1],
-//           sigma = p[2],
-//           tau = p[3], // Novosibirsk argument
-//           kL = p[4],
-//           kR = p[5],
-//           aL = p[6],
-//           nL = p[7],
-//           aR = p[8],
-//           nR = p[9];
-//    if (sigma <= 0) return N;
-//    bool kNovosibirsk = (tau >= 1e-7);
-//
-//    auto z = [&kNovosibirsk,&mu,&sigma,&tau](double x)
-//    {    
-//        if (kNovosibirsk)
-//        {
-//            const double Lambda = asinh( tau * sqrtLn4 ) / ( sigma*tau*sqrtLn4 );
-//            return sqrt(pow( log(1+Lambda*tau*(x-mu))/tau ,2) + pow(tau,2));
-//        }
-//        else
-//            return (x-mu)/sigma;
-//    };   
-//
-//    if (X <= aL)
-//        return N * exp(  pow(z(kL),2)/2 - z(kL)*z(aL) ) * pow(-nL/z(kL),nL) * pow(z(aL) - nL/z(kL) - z(X), -nL) ;
-//    else if (X <= kL)
-//        return N * exp(  pow(z(kL),2)/2 - z(kL)*z( X) );
-//    else if (X <= kR)
-//        return N * exp( -pow(z( X),2)/2 );
-//    else if (X <= aR)
-//        return N * exp(  pow(z(kR),2)/2 - z(kR)*z( X) );
-//    else
-//        return N * exp(  pow(z(kR),2)/2 - z(kR)*z(aR) ) * pow(-nR/z(kR),nR) * pow(z(aR) - nR/z(kR) - z(X), -nR) ;
-//}
-
 void make_RM (TH2 * h_RM,
               TH2 * h_resolution,
               double (* xsec)(double),
@@ -245,7 +205,7 @@ void make_measurement (TH1 * h_gen,
         // measurement
         double x, pt_rec;
         if (f_resolution->GetParameter(1) == 0)
-            x = f_resolution->GetParameter(0);
+            x = f_resolution->GetParameter(1);
         else
             x = f_resolution->GetRandom(minresolution, maxresolution);
         pt_rec = pt_gen*(1-x);
@@ -444,7 +404,8 @@ TCanvas * make_canvas (TH1 * h_gen,
                        TH2 * h_resolution,
                        TString true_xsec,
                        TString MC_xsec,
-                       vector<TString> parameters)
+                       vector<TString> parameters,
+                       vector<TString> requirements)
 {
     // defining canvas
     TCanvas * c = new TCanvas ("canvas");
@@ -475,7 +436,7 @@ TCanvas * make_canvas (TH1 * h_gen,
     h_resolution->DrawCopy("colz");
     h_resolution->Write();
     // TPaveText (Double_t x1, Double_t y1, Double_t x2, Double_t y2, Option_t *option="br")
-    TPaveText * resolution_text  = new TPaveText(0.7, 0.7 , 0.89, 0.89, "NBNDC");
+    TPaveText * resolution_text  = new TPaveText(0.7, 0.6 , 0.89, 0.89, "NBNDC");
     resolution_text->SetFillColorAlpha(0,0);
     resolution_text->SetTextFont(42);
     for (const TString& parameter: parameters)
@@ -497,6 +458,13 @@ TCanvas * make_canvas (TH1 * h_gen,
         ABPS[i]->Write();
     }
     c->GetPad(2)->GetPad(1)->BuildLegend(0.4,0.35,0.6,0.6);
+    // TPaveText (Double_t x1, Double_t y1, Double_t x2, Double_t y2, Option_t *option="br")
+    TPaveText * ABPS_text  = new TPaveText(0.6, 0.7 , 0.89, 0.89, "NBNDC");
+    ABPS_text->SetFillColorAlpha(0,0);
+    ABPS_text->SetTextFont(42);
+    for (const TString& requirement: requirements)
+        ABPS_text->AddText(requirement);
+    ABPS_text->Draw();
     c->GetPad(2)->GetPad(1)->RedrawAxis();
 
     pair<TH1 *, TH1 *> miss_and_fake = make_miss_fake(h_RM, h_gen, h_rec);
@@ -600,14 +568,15 @@ int main (int argc, char* argv[])
     TFile * f = new TFile ("unfolding.root", "RECREATE");
 
     // parameters TODO
-    const unsigned long nevents = 1e7;
+    const unsigned long nevents = 2e7;
     vector<TString> vsampling = {"perfect", "uniform", "core"};
-    double N = 1, tau = 0 /* TODO check nonzero tau -> seg */, kL = -1, kR = 1, aL = -1, nL = 1, aR = 1, nR = 1; // TODO: play with this
+    double N = 1, kL = -1, kR = 1, aL = -1, nL = 1, aR = 1, nR = 1; // TODO: play with this
     // my guess: the resolution is fundamentally gaussian, every deviation comes from a bad matching --> to be studied
     vector<double> vmu     ; for (unsigned short i = 0 ; i <= 0 ; i++) vmu     .push_back(i*0.01);
     vector<double> vsigma  ; for (unsigned short i = 1 ; i <= 2 ; i++) vsigma  .push_back(i*0.02);
+    vector<double> vtau    ; for (unsigned short i = 0 ; i <= 3 ; i++) vtau    .push_back(i*0.002);
     vector<double> vminSP  ; for (unsigned short i = 6 ; i <= 9 ; i++) vminSP  .push_back(i*0.10);
-    vector<double> triggers; for (unsigned short i = 0 ; i <= 5 ; i++) triggers.push_back(i*  10);
+    vector<double> triggers; for (unsigned short i = 0 ; i <= 3 ; i++) triggers.push_back(i*  10);
     
     map<TString, double (*)(double)> MC_spectra = {{"flat spectrum", flat_spectrum},
                                                    {"#frac{1}{p_{T}^{4}}", falling_spectrum},
@@ -620,7 +589,7 @@ int main (int argc, char* argv[])
         divider(sampling + " sampling")->Print(sampling + ".pdf"); // frontpage
     }
     vector<double> binning;
-    for (int i = 18 ; i <= 153 ; i++)
+    for (int i = 18 ; i <= 220 ; i++)
         binning.push_back(i);
     //// Mikko's binning
     //vector<double> std_binning = {/*0,*/18,21,24,28,32,37,43,49,56,64,74,84,97,114,133,153,174,196,220,245,272,300,330/*,362,395,430,468,507,548,592,638,686,737,790,846,905,967,1032,1101,1172,1248,1327,1410,1497,1588,1684,1784,1890,2000,2116,2238,2366,2500,2640,2787,2941,3103,3273,3450,3637,3832,4037,4252,4477,4713,4961,5220,5492,5777,6076,6389,6717,7000*/}; // std in SMP-j
@@ -633,15 +602,16 @@ int main (int argc, char* argv[])
         TCanvas * section = divider("MC spectrum ~ " + MC_spectrum.first);
         for (const TString& sampling: vsampling)
             section->Print(sampling + ".pdf");
-        for (const double& trigger: triggers) for (const double& minSP: vminSP) for (const double& mu: vmu) for (const double& sigma: vsigma)
+        for (const double& trigger: triggers) for (const double& minSP: vminSP) for (const double& mu: vmu) for (const double& sigma: vsigma) for (const double& tau: vtau)
         {
             cout << "================================================================================"
                  << "\nParameters:"
                  << "\n\tmin stability & purity = " << minSP 
                  << "\n\tnevents = " << nevents << endl;
-            vector<TString> parameterisation = {TString::Format("#minSP=%f",minSP), TString::Format("#mu=%f",mu), TString::Format("#sigma=%f", sigma)};
+            vector<TString> parameterisation = {TString::Format("#mu=%f",mu), TString::Format("#sigma=%f", sigma), TString::Format("#tau=%f", tau)},
+                            requirements     = {TString::Format("minSP=%f",minSP), TString::Format("efficient trigger from %f", trigger)};
 
-            TString dirname = MC_spectrum.first + "_" + TString::Format("_trigger%f_minSP%f_mu%f_sigma%f", trigger, minSP, mu, sigma);
+            TString dirname = MC_spectrum.first + "_" + TString::Format("_trigger%f_minSP%f_mu%f_sigma%f_tau%f", trigger, minSP, mu, sigma, tau);
             dirname.ReplaceAll(".", "p");
             dirname.ReplaceAll(" ", "_");
             dirname.ReplaceAll("-", "_");
@@ -672,6 +642,13 @@ int main (int argc, char* argv[])
                  * h_rec = new TH1D ("rec", "Measurement", binning.size()-1, &binning[0]);
             const double minpt = 0, maxpt = h_gen->GetXaxis()->GetXmax()*1.1;
             make_measurement(h_gen, h_rec, falling_spectrum, minpt, maxpt, f_resolution, nevents, trigger);
+            //TCanvas * c = new TCanvas ();
+            //h_gen->SetLineColor(kRed);
+            //h_gen->Draw();
+            //h_rec->Draw("same");
+            //c->Print("test.pdf");
+            //return EXIT_SUCCESS;
+
             for (TString sampling: vsampling)
             {
                 TCanvas * c;
@@ -702,7 +679,7 @@ int main (int argc, char* argv[])
                     cout << "=== Making canvas" << endl;
                     //make_canvas(static_cast<TH1 *>(h_gen->Clone("gen_" + sampling)), static_cast<TH1 *>(h_rec->Clone("rec_" + sampling)), h_RM, h_resolution, /*true*/ "#frac{1}{p_{T}^{4}}", /*MC*/ MC_spectrum.first, {TString::Format("#mu=%f",mu), TString::Format("#sigma=%f", sigma)} )->Print(sampling + ".pdf");
 
-                    c = make_canvas(rebinned_gen, rebinned_rec, rebinned_RM, h_resolution, /*true*/ "#frac{1}{p_{T}^{4}}", /*MC*/ MC_spectrum.first, parameterisation);
+                    c = make_canvas(rebinned_gen, rebinned_rec, rebinned_RM, h_resolution, /*true*/ "#frac{1}{p_{T}^{4}}", /*MC*/ MC_spectrum.first, parameterisation, requirements);
                 }
                 catch (TString msg)
                 {
