@@ -117,7 +117,7 @@ void make_RM (TH2 * h_RM,
               unsigned long nevents,
               TString sampling)
 {
-    bool kDiagonalOnly = (f_resolution->GetParameter(1) == 0),
+    bool kDiagonalOnly = (f_resolution->GetParameter(2) == 0),
          kPerfectSampling = (sampling == "perfect"),
          kUniformSampling = (sampling == "uniform"),
          kCoreSampling = (sampling == "core");
