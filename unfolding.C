@@ -31,7 +31,7 @@
 
 using namespace std;
 
-double Resolution (double *, double *);
+double Resolution (double * x, double * p);
 
 TCanvas * divider (const vector<TString> lines, Color_t fillcolor = kGray)
 {
@@ -165,7 +165,7 @@ void make_RM (TH2 * h_RM,
             if (kDiagonalOnly)
             {
                 pt_rec = pt_gen*(1-x);
-                x = f_resolution->GetParameter(0);
+                x = f_resolution->GetParameter(1);
             }
             else if (kUniformSampling)
             {
@@ -590,28 +590,22 @@ TCanvas * make_canvas (TH1 * h_gen,
 
 int main (int argc, char* argv[])
 {
+    gROOT->SetBatch();
     gStyle->SetOptTitle(0);
     TH1D::SetDefaultSumw2(true); // correct error computation
     TColor::CreateColorWheel();
 
     // declaring TApplication (needed to use the full power of Root as a library)
     TApplication * rootapp = new TApplication ("unfolding", &argc, argv);
-
-    // batch mode? (useful if bad connection or if submitted as a job)
-    /*bool batch = (rootapp->Argc() > 1 && (TString(rootapp->Argv(1)) == "--batch" ||
-                                          TString(rootapp->Argv(1)) ==   "batch" ||
-                                          TString(rootapp->Argv(1)) ==   "b"     ||
-                                          TString(rootapp->Argv(1)) ==  "-b"       ));
-    if (batch)*/ gROOT->SetBatch();
     TFile * f = new TFile ("unfolding.root", "RECREATE");
 
     // parameters TODO
     const unsigned long nevents = 5e6;
     vector<TString> vsampling = {"perfect", "uniform", "core"};
-    double N = 1, tau = 0, kL = -1, kR = 1, aL = -1, nL = 0, aR = 1, nR = 0; // TODO: play with this
+    double N = 1, tau = 0 /* TODO check nonzero tau -> seg */, kL = -0.3, kR = 0.3, aL = -1, nL = 3, aR = 0.3, nR = 6; // TODO: play with this
     vector<double> vmu     ; for (unsigned short i = 0 ; i <= 0 ; i++) vmu     .push_back(i*0.01);
     vector<double> vsigma  ; for (unsigned short i = 2 ; i <= 2 ; i++) vsigma  .push_back(i*0.02);
-    vector<double> vminSP  ; for (unsigned short i = 6 ; i <= 9 ; i++) vminSP  .push_back(i*0.10);
+    vector<double> vminSP  ; for (unsigned short i = 6 ; i <= 6 ; i++) vminSP  .push_back(i*0.10);
     vector<double> triggers; for (unsigned short i = 0 ; i <= 0 ; i++) triggers.push_back(i*  10);
     
     map<TString, double (*)(double)> MC_spectra = {{"flat spectrum", flat_spectrum},
@@ -643,8 +637,6 @@ int main (int argc, char* argv[])
             cout << "================================================================================"
                  << "\nParameters:"
                  << "\n\tmin stability & purity = " << minSP 
-                 << "\n\tmu = " << mu
-                 << "\n\tsigma = " << sigma 
                  << "\n\tnevents = " << nevents << endl;
             vector<TString> parameterisation = {TString::Format("#minSP=%f",minSP), TString::Format("#mu=%f",mu), TString::Format("#sigma=%f", sigma)};
 
@@ -659,8 +651,20 @@ int main (int argc, char* argv[])
             f->mkdir(dirname)->cd();
 
             cout << "=== Defining resolution function (used only if sigma different from 0)" << endl;
-            TF1 * f_resolution = new TF1 ("resolution", Resolution, -1, 1, 2);
+            TF1 * f_resolution = new TF1 ("resolution", Resolution, -1, 1, 10);
             f_resolution->SetParameters(N, mu, sigma, tau, kL, kR, aL, nL, aR, nR);
+            cout << "Parameters:"
+                 << "\nN=" << N
+                 << "\nmu=" << mu
+                 << "\nsigma=" << sigma
+                 << "\ntau=" << tau
+                 << "\nkL=" << kL
+                 << "\nkR=" << kR
+                 << "\naL=" << aL
+                 << "\nnL=" << nL
+                 << "\naR=" << aR
+                 << "\nnR=" << nR
+                 <<  endl;
 
             cout << "=== Defining gen and rec histograms" << endl;
             TH1D * h_gen = new TH1D ("gen", "Truth"      , binning.size()-1, &binning[0]),

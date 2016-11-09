@@ -9,11 +9,11 @@ double Resolution (double *x, double *p)
            mu = p[1],
            sigma = p[2],
            tau = p[3], // Novosibirsk argument
-           kL = p[4],
-           kR = p[5],
-           aL = p[6],
-           nL = p[7],
-           aR = p[8],
+           kL = p[4], // left transition region
+           kR = p[5], // right transition region
+           aL = p[6], // left tail
+           nL = p[7], 
+           aR = p[8], // right tail
            nR = p[9];
     if (sigma <= 0) return 0;
     bool kNovosibirsk = (tau >= 1e-7);
