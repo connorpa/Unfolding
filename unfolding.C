@@ -408,8 +408,8 @@ TCanvas * make_canvas (TH1 * h_gen,
                        vector<TString> requirements)
 {
     int nbins = new_edges.size()-1;
-    TH1 * rebinned_gen = h_gen->Rebin(nbins, sampling + TString("_rebinned_") + h_gen->GetName(), &new_edges[0]),
-        * rebinned_rec = h_rec->Rebin(nbins, sampling + TString("_rebinned_") + h_rec->GetName(), &new_edges[0]);
+    TH1 * rebinned_gen = h_gen->Rebin(nbins, TString("rebinned_") + h_gen->GetName(), &new_edges[0]),
+        * rebinned_rec = h_rec->Rebin(nbins, TString("rebinned_") + h_rec->GetName(), &new_edges[0]);
     TH2 * rebinned_RM = new TH2D ("rebinned_RM", h_RM->GetTitle(), nbins, &new_edges[0], nbins, &new_edges[0]);
     rebinned_RM->SetStats(0);
     for (int ybin = 0 ; ybin <= h_RM->GetNbinsY()+1 ; ++ybin)
@@ -446,8 +446,8 @@ TCanvas * make_canvas (TH1 * h_gen,
     c->GetPad(3)->SetLogy();
     c->GetPad(3)->SetLogz();
     c->GetPad(3)->SetTopMargin(0);
-    rebinned_resolution->DrawCopy("colz");
-    rebinned_resolution->Write();
+    h_resolution->DrawCopy("colz");
+    h_resolution->Write();
     // TPaveText (Double_t x1, Double_t y1, Double_t x2, Double_t y2, Option_t *option="br")
     TPaveText * resolution_text  = new TPaveText(0.7, 0.6 , 0.89, 0.89, "NBNDC");
     resolution_text->SetFillColorAlpha(0,0);
@@ -545,7 +545,7 @@ TCanvas * make_canvas (TH1 * h_gen,
     delete rebinned_gen;
     delete rebinned_rec;
     delete rebinned_RM;
-    delete rebinned_resolution;
+    delete h_resolution;
     delete miss_and_fake.first ;
     delete miss_and_fake.second;
     for (auto& unfolded_spectrum: unfolded_spectra)
