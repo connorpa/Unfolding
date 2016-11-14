@@ -87,18 +87,19 @@ void make_RM (TH2 * h_RM,
 
     TRandom3 r;
     cout << ">>> RM and resolution" << endl;
+    const double step = 1; // TODO
     if (kPerfectSampling)
     {
         for (int ybin = 1 ; ybin <= h_RM->GetNbinsY() ; ybin++)
         {
             double ybinwidth = h_RM->GetYaxis()->GetBinWidth(ybin);
-            for (double pt_gen = h_RM->GetYaxis()->GetBinLowEdge(ybin)+1 ; pt_gen <= h_RM->GetYaxis()->GetBinUpEdge(ybin) ; pt_gen++) // TODO: change step
+            for (double pt_gen = h_RM->GetYaxis()->GetBinLowEdge(ybin)+1 ; pt_gen <= h_RM->GetYaxis()->GetBinUpEdge(ybin) ; pt_gen += step)
             {
                 double current_xsec = xsec(pt_gen);
                 for (int xbin = 1 ; xbin <= h_RM->GetNbinsX() ; xbin++)
                 {
                     double xbinwidth = h_RM->GetXaxis()->GetBinWidth(xbin);
-                    for (double pt_rec = h_RM->GetXaxis()->GetBinLowEdge(xbin)+1 ; pt_rec <= h_RM->GetXaxis()->GetBinUpEdge(xbin) ; pt_rec++) // TODO: change step
+                    for (double pt_rec = h_RM->GetXaxis()->GetBinLowEdge(xbin)+1 ; pt_rec <= h_RM->GetXaxis()->GetBinUpEdge(xbin) ; pt_rec += step)
                     {
                         double x = (pt_gen-pt_rec)/pt_gen,
                                resolution = f_resolution->Eval(x);
@@ -108,7 +109,7 @@ void make_RM (TH2 * h_RM,
                 }
             }
         }
-        // attempt to add an uncertainty TODO
+        // add an uncertainty
         for (int ybin = 1 ; ybin <= h_RM->GetNbinsY() ; ybin++)
             for (int xbin = 1 ; xbin <= h_RM->GetNbinsX() ; xbin++)
                 h_RM->SetBinError(xbin, ybin, 1./sqrt(h_RM->GetBinContent(xbin, ybin)));
@@ -132,7 +133,7 @@ void make_RM (TH2 * h_RM,
                 pt_rec = minpt + r.Rndm()*(maxpt-minpt);
                 x = (pt_gen-pt_rec)/pt_gen;
                 if (x < minresolution)
-                    continue; // to mimick core sampling TODO?
+                    continue; // to mimick core sampling
                 else if (x > maxresolution) // this should normally never happen if maxresolution is correctly set to 1
                     throw TString::Format("pt_gen=%f && pt_rec=%f => x=%f", pt_gen, pt_rec, x);
                 weight *= f_resolution->Eval(x);
@@ -193,7 +194,7 @@ void make_measurement (TH1 * h_gen,
                        double trigger)
 {
     cout << ">>> truth and measurement" << endl;
-    TRandom3 r; // TODO: seed
+    TRandom3 r;
     double minresolution = f_resolution->GetXmin(),
            maxresolution = f_resolution->GetXmax();
     for (unsigned long i = 0 ; i < nevents ; i++)
@@ -272,9 +273,7 @@ vector<double> find_binning (TH2 * h_RM, float minimal_stability, float minimal_
     }
     const int nbins = new_edges.size()-1;
     if (nbins < 2) throw TString("Invalid bin width");
-    //if (nbins%2) new_edges.pop_back(); // TODO? see remark about rebinning in make_unfolding()
     new_edges.back() = px->GetXaxis()->GetXmax(); // last edge has to match /b/ old and new binnings
-    // TODO: what about empty bins at high values?
     cout << "New binning (nbins=" << new_edges.size()-1 << "):";
     for (auto& new_edge: new_edges)
         cout << '\t' << new_edge;
@@ -468,20 +467,15 @@ TCanvas * make_canvas (TH1 * h_gen,
     c->GetPad(2)->GetPad(1)->RedrawAxis();
 
     pair<TH1 *, TH1 *> miss_and_fake = make_miss_fake(h_RM, h_gen, h_rec);
-    //miss_and_fake.first ->Rebin(2);
-    //miss_and_fake.second->Rebin(2);
 
     cout << "=== Plotting spectra" << endl;
     c->GetPad(2)->cd(2);
     c->GetPad(2)->GetPad(2)->SetLogx();
     c->GetPad(2)->GetPad(2)->SetLogy();
-    //h_RM->Rebin2D(1,2);
-    //h_gen->Rebin(2);
 
     // the following vector will contain all the spectra at hadron level: the generated spectrum and the unfolded spectra
     vector<TH1 *> unfolded_spectra = make_unfolding(h_RM, h_rec);
 
-    //h_rec->Rebin(2); // TODO: keep fine binning at rec level for the unfolding??
     h_rec->Scale(1,"width");
     h_gen->Scale(1,"width");
     h_rec->DrawCopy();
@@ -489,12 +483,12 @@ TCanvas * make_canvas (TH1 * h_gen,
     h_gen->Write();
     h_rec->Write();
 
-    miss_and_fake.first ->Scale(1,"width");
     miss_and_fake.second->Scale(1,"width");
-    miss_and_fake.first ->DrawCopy("same hist");
+    miss_and_fake.first ->Scale(1,"width");
     miss_and_fake.second->DrawCopy("same hist");
-    miss_and_fake.first ->Write();
+    miss_and_fake.first ->DrawCopy("same hist");
     miss_and_fake.second->Write();
+    miss_and_fake.first ->Write();
 
     for (auto& unfolded_spectrum: unfolded_spectra)
     {
@@ -567,8 +561,8 @@ int main (int argc, char* argv[])
     TApplication * rootapp = new TApplication ("unfolding", &argc, argv);
     TFile * f = new TFile ("unfolding.root", "RECREATE");
 
-    // parameters TODO
-    const unsigned long nevents = 2e7;
+    // parameters 
+    const unsigned long nevents = 1e8;
     vector<TString> vsampling = {"perfect", "uniform", "core"};
     double N = 1, kL = -1, kR = 1, aL = -1, nL = 1, aR = 1, nR = 1; // TODO: play with this
     // my guess: the resolution is fundamentally gaussian, every deviation comes from a bad matching --> to be studied
@@ -589,7 +583,7 @@ int main (int argc, char* argv[])
         divider(sampling + " sampling")->Print(sampling + ".pdf"); // frontpage
     }
     vector<double> binning;
-    for (int i = 18 ; i <= 220 ; i++)
+    for (int i = 18 ; i <= 330 ; i++)
         binning.push_back(i);
     //// Mikko's binning
     //vector<double> std_binning = {/*0,*/18,21,24,28,32,37,43,49,56,64,74,84,97,114,133,153,174,196,220,245,272,300,330/*,362,395,430,468,507,548,592,638,686,737,790,846,905,967,1032,1101,1172,1248,1327,1410,1497,1588,1684,1784,1890,2000,2116,2238,2366,2500,2640,2787,2941,3103,3273,3450,3637,3832,4037,4252,4477,4713,4961,5220,5492,5777,6076,6389,6717,7000*/}; // std in SMP-j
@@ -642,12 +636,6 @@ int main (int argc, char* argv[])
                  * h_rec = new TH1D ("rec", "Measurement", binning.size()-1, &binning[0]);
             const double minpt = 0, maxpt = h_gen->GetXaxis()->GetXmax()*1.1;
             make_measurement(h_gen, h_rec, falling_spectrum, minpt, maxpt, f_resolution, nevents, trigger);
-            //TCanvas * c = new TCanvas ();
-            //h_gen->SetLineColor(kRed);
-            //h_gen->Draw();
-            //h_rec->Draw("same");
-            //c->Print("test.pdf");
-            //return EXIT_SUCCESS;
 
             for (TString sampling: vsampling)
             {
@@ -677,8 +665,6 @@ int main (int argc, char* argv[])
                                               h_RM->GetBinContent(xbin, ybin));
 
                     cout << "=== Making canvas" << endl;
-                    //make_canvas(static_cast<TH1 *>(h_gen->Clone("gen_" + sampling)), static_cast<TH1 *>(h_rec->Clone("rec_" + sampling)), h_RM, h_resolution, /*true*/ "#frac{1}{p_{T}^{4}}", /*MC*/ MC_spectrum.first, {TString::Format("#mu=%f",mu), TString::Format("#sigma=%f", sigma)} )->Print(sampling + ".pdf");
-
                     c = make_canvas(rebinned_gen, rebinned_rec, rebinned_RM, h_resolution, /*true*/ "#frac{1}{p_{T}^{4}}", /*MC*/ MC_spectrum.first, parameterisation, requirements);
                 }
                 catch (TString msg)
