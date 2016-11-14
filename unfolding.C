@@ -415,6 +415,7 @@ TCanvas * make_canvas (TH1 * h_gen,
     c->GetPad(1)->SetLogx();
     c->GetPad(1)->SetLogy();
     c->GetPad(1)->SetLogz();
+    c->GetPad(1)->SetTopMargin(0);
     h_RM->GetXaxis()->SetNoExponent();
     h_RM->GetXaxis()->SetMoreLogLabels();
     h_RM->GetYaxis()->SetNoExponent();
@@ -432,6 +433,7 @@ TCanvas * make_canvas (TH1 * h_gen,
     c->cd(3);
     c->GetPad(3)->SetLogy();
     c->GetPad(3)->SetLogz();
+    c->GetPad(3)->SetTopMargin(0);
     h_resolution->DrawCopy("colz");
     h_resolution->Write();
     // TPaveText (Double_t x1, Double_t y1, Double_t x2, Double_t y2, Option_t *option="br")
@@ -456,9 +458,9 @@ TCanvas * make_canvas (TH1 * h_gen,
         ABPS[i]->Draw("same hist");
         ABPS[i]->Write();
     }
-    c->GetPad(2)->GetPad(1)->BuildLegend(0.4,0.35,0.6,0.6);
+    c->GetPad(2)->GetPad(1)->BuildLegend(0.4,0.2,0.6,0.5);
     // TPaveText (Double_t x1, Double_t y1, Double_t x2, Double_t y2, Option_t *option="br")
-    TPaveText * ABPS_text  = new TPaveText(0.6, 0.7 , 0.89, 0.89, "NBNDC");
+    TPaveText * ABPS_text  = new TPaveText(0.6, 0.25, 0.89, 0.45, "NBNDC");
     ABPS_text->SetFillColorAlpha(0,0);
     ABPS_text->SetTextFont(42);
     for (const TString& requirement: requirements)
@@ -583,7 +585,7 @@ int main (int argc, char* argv[])
         divider(sampling + " sampling")->Print(sampling + ".pdf"); // frontpage
     }
     vector<double> binning;
-    for (int i = 18 ; i <= 330 ; i++)
+    for (int i = 18 ; i <= 330 ; i++) // TODO
         binning.push_back(i);
     //// Mikko's binning
     //vector<double> std_binning = {/*0,*/18,21,24,28,32,37,43,49,56,64,74,84,97,114,133,153,174,196,220,245,272,300,330/*,362,395,430,468,507,548,592,638,686,737,790,846,905,967,1032,1101,1172,1248,1327,1410,1497,1588,1684,1784,1890,2000,2116,2238,2366,2500,2640,2787,2941,3103,3273,3450,3637,3832,4037,4252,4477,4713,4961,5220,5492,5777,6076,6389,6717,7000*/}; // std in SMP-j
