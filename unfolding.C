@@ -427,7 +427,8 @@ TCanvas * make_canvas (TH1 * h_gen,
     c->GetPad(1)->SetLogx();
     c->GetPad(1)->SetLogy();
     c->GetPad(1)->SetLogz();
-    c->GetPad(1)->SetTopMargin(0);
+    c->GetPad(1)->SetTopMargin(0.01);
+    c->GetPad(1)->SetBottomMargin(0.01);
     rebinned_RM->GetXaxis()->SetNoExponent();
     rebinned_RM->GetXaxis()->SetMoreLogLabels();
     rebinned_RM->GetYaxis()->SetNoExponent();
@@ -445,7 +446,8 @@ TCanvas * make_canvas (TH1 * h_gen,
     c->cd(3);
     c->GetPad(3)->SetLogy();
     c->GetPad(3)->SetLogz();
-    c->GetPad(3)->SetTopMargin(0);
+    c->GetPad(3)->SetTopMargin(0.01);
+    c->GetPad(3)->SetBottomMargin(0.01);
     h_resolution->DrawCopy("colz");
     h_resolution->Write();
     // TPaveText (Double_t x1, Double_t y1, Double_t x2, Double_t y2, Option_t *option="br")
@@ -576,15 +578,15 @@ int main (int argc, char* argv[])
     TFile * f = new TFile ("unfolding.root", "RECREATE");
 
     // parameters 
-    const unsigned long nevents = 1e8;
-    vector<TString> vsampling = {"perfect", "uniform", "core"};
+    const unsigned long nevents = 1e6;
+    vector<TString> vsampling = {/*"perfect", "uniform",*/ "core"};
     double N = 1, kL = -1, kR = 1, aL = -1, nL = 1, aR = 1, nR = 1; // TODO: play with this
     // my guess: the resolution is fundamentally gaussian, every deviation comes from a bad matching --> to be studied
     vector<double> vmu     ; for (unsigned short i = 0 ; i <= 0 ; i++) vmu     .push_back(i*0.01);
     vector<double> vsigma  ; for (unsigned short i = 1 ; i <= 2 ; i++) vsigma  .push_back(i*0.02);
     vector<double> vtau    ; for (unsigned short i = 0 ; i <= 3 ; i++) vtau    .push_back(i*0.002);
-    vector<double> vminSP  ; for (unsigned short i = 6 ; i <= 9 ; i++) vminSP  .push_back(i*0.10);
-    vector<double> triggers; for (unsigned short i = 0 ; i <= 3 ; i++) triggers.push_back(i*  10);
+    vector<double> vminSP  ; for (unsigned short i = 6 ; i <= 6 ; i++) vminSP  .push_back(i*0.10);
+    vector<double> triggers; for (unsigned short i = 0 ; i <= 0 ; i++) triggers.push_back(i*  10);
     
     map<TString, double (*)(double)> MC_spectra = {{"flat spectrum", flat_spectrum},
                                                    {"#frac{1}{p_{T}^{4}}", falling_spectrum},
