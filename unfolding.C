@@ -239,7 +239,7 @@ void make_measurement (TH1 * h_gen,
     h_gen->SetStats(0);
 }
 
-vector<double> find_binning (TH2 * h_RM, float minimal_stability, float minimal_purity)
+vector<double> find_binning (TH2 * h_RM, float minimal_stability, float minimal_purity) // TODO: add min statistics
 {
     TH1D * px = h_RM->ProjectionX("px", 1, -1),
          * py = h_RM->ProjectionY("py", 1, -1);
@@ -284,16 +284,25 @@ vector<double> find_binning (TH2 * h_RM, float minimal_stability, float minimal_
     return new_edges;
 }
 
-vector<TH1 *> make_unfolding (TH2 * h_RM,
+vector<TH1 *> make_unfolding (TH2 * rebinned_RM,
+                              TH1 * rebinned_rec,
+                              TH2 * semi_rebinned_RM,
                               TH1 * h_rec)
 { // TODO: see whether the binning could not be different for the different cases
     vector<TH1 *> unfolded_spectra;
 
-    TH1D * h_RM_projx = h_RM->ProjectionX("measurement", 0, -1, "oe"),
-         * h_RM_projy = h_RM->ProjectionY("truth"      , 0, -1, "oe");
-    TH2D * h_RM_noUnderflow = static_cast<TH2D *>(h_RM->Clone("RM_noUnderflow"));
-    for (int xbin = 0 ; xbin < h_RM_noUnderflow->GetNbinsX() ; xbin++) h_RM_noUnderflow->SetBinContent(xbin, 0, 0);
-    for (int ybin = 0 ; ybin < h_RM_noUnderflow->GetNbinsY() ; ybin++) h_RM_noUnderflow->SetBinContent(0, ybin, 0);
+    TH1D * semi_rebinned_RM_projx = semi_rebinned_RM->ProjectionX("measurement", 0, -1, "oe"),
+         * semi_rebinned_RM_projy = semi_rebinned_RM->ProjectionY("truth"      , 0, -1, "oe");
+    TH2D * semi_rebinned_RM_noUnderflow = static_cast<TH2D *>(semi_rebinned_RM->Clone("RM_noUnderflow"));
+    for (int xbin = 0 ; xbin < semi_rebinned_RM_noUnderflow->GetNbinsX() ; xbin++) semi_rebinned_RM_noUnderflow->SetBinContent(xbin, 0, 0);
+    for (int ybin = 0 ; ybin < semi_rebinned_RM_noUnderflow->GetNbinsY() ; ybin++) semi_rebinned_RM_noUnderflow->SetBinContent(0, ybin, 0);
+
+    TH1D * rebinned_RM_projx = rebinned_RM->ProjectionX("rebinned_measurement", 0, -1, "oe"),
+         * rebinned_RM_projy = rebinned_RM->ProjectionY("rebinned_truth"      , 0, -1, "oe");
+    TH2D * rebinned_RM_noUnderflow = static_cast<TH2D *>(rebinned_RM->Clone("RM_noUnderflow"));
+    for (int xbin = 0 ; xbin < rebinned_RM_noUnderflow->GetNbinsX() ; xbin++) rebinned_RM_noUnderflow->SetBinContent(xbin, 0, 0);
+    for (int ybin = 0 ; ybin < rebinned_RM_noUnderflow->GetNbinsY() ; ybin++) rebinned_RM_noUnderflow->SetBinContent(0, ybin, 0);
+
     //RooUnfoldResponse (const TH1* measured, const TH1* truth, const TH2* response, const char* name= 0, const char* title= 0);  // create from already-filled histograms
     // Set up from already-filled histograms.
     // "response" gives the response matrix, measured X truth.
@@ -303,33 +312,36 @@ vector<TH1 *> make_unfolding (TH2 * h_RM,
     // "measured" and/or "truth" can be specified as 0 (1D case only) or an empty histograms (no entries) as a shortcut
     // to indicate, respectively, no fakes and/or no inefficiency.
     cout << "=== Unfolding:\n>>>Preparing RM" << endl;
-    RooUnfoldResponse * RU_response = new RooUnfoldResponse(h_RM_projx, h_RM_projy, h_RM_noUnderflow);
+
+    RooUnfoldResponse * RU_response = new RooUnfoldResponse(rebinned_RM_projx, rebinned_RM_projy, rebinned_RM_noUnderflow);
     RooUnfold * RU_unfolding;
-    // bin by bin
-    cout << ">>> Bin-by-bin unfolding" << endl;
-    RU_unfolding = new RooUnfoldBinByBin (RU_response, h_rec, "binbybin");
-    unfolded_spectra.push_back(static_cast<TH1D*>(RU_unfolding->Hreco()->Clone("BinByBin")));
-    unfolded_spectra.back()->SetTitle("BinByBin");
     // inversion
     cout << ">>> matrix-inversion unfolding" << endl;
-    RU_unfolding = new RooUnfoldInvert (RU_response, h_rec, "inv");
+    RU_unfolding = new RooUnfoldInvert (RU_response, rebinned_rec, "inv");
     unfolded_spectra.push_back(static_cast<TH1D*>(RU_unfolding->Hreco()->Clone("Inverse")));
     unfolded_spectra.back()->SetTitle("Inverse");
+    // SVD
+    cout << ">>> SVD unfolding" << endl;
+    RU_unfolding = new RooUnfoldSvd (RU_response, rebinned_rec, 20, "svd");
+    unfolded_spectra.push_back(static_cast<TH1D*>(RU_unfolding->Hreco()->Clone("SVD")));
+    unfolded_spectra.back()->SetTitle("SVD");
+
+    RU_response = new RooUnfoldResponse(semi_rebinned_RM_projx, semi_rebinned_RM_projy, semi_rebinned_RM_noUnderflow);
+    // bin by bin
+    cout << ">>> Bin-by-bin unfolding" << endl;
+    RU_unfolding = new RooUnfoldBinByBin (RU_response, rebinned_rec, "binbybin");
+    unfolded_spectra.push_back(static_cast<TH1D*>(RU_unfolding->Hreco()->Clone("BinByBin")));
+    unfolded_spectra.back()->SetTitle("BinByBin");
     // Bayes
     cout << ">>> Bayes unfolding" << endl;
     RU_unfolding = new RooUnfoldBayes (RU_response, h_rec, 4, "bayes");
     unfolded_spectra.push_back(static_cast<TH1D*>(RU_unfolding->Hreco()->Clone("Bayes")));
     unfolded_spectra.back()->SetTitle("Bayes");
-    // SVD
-    cout << ">>> SVD unfolding" << endl;
-    RU_unfolding = new RooUnfoldSvd (RU_response, h_rec, 20, "svd");
-    unfolded_spectra.push_back(static_cast<TH1D*>(RU_unfolding->Hreco()->Clone("SVD")));
-    unfolded_spectra.back()->SetTitle("SVD");
-    //// TUnfold  TODO
-    //cout << ">>> TUnfold unfolding" << endl;
-    //RU_unfolding = new RooUnfoldTUnfold (RU_response, h_rec, TUnfold::kRegModeDerivative, "tu");
-    //unfolded_spectra.push_back(static_cast<TH1D*>(RU_unfolding->Hreco()->Clone("TUnfold")));
-    //unfolded_spectra.back()->SetTitle("TUnfold");
+    // TUnfold
+    cout << ">>> TUnfold unfolding" << endl;
+    RU_unfolding = new RooUnfoldTUnfold (RU_response, h_rec, TUnfold::kRegModeDerivative, "tu");
+    unfolded_spectra.push_back(static_cast<TH1D*>(RU_unfolding->Hreco()->Clone("TUnfold")));
+    unfolded_spectra.back()->SetTitle("TUnfold");
 
     vector<Color_t> colours = {kBlue, kMagenta+2, kOrange+7, kGreen+3, kCyan+2, kAzure+3};
     for (unsigned short i = 0 ; i < unfolded_spectra.size() ; i++)
@@ -372,8 +384,8 @@ vector<TH1 *> make_ABPS (TH2 * h_RM)
     TH1 * background = h_RM->ProjectionY("background", 0,  0, "eo");
     background->Divide(h_RM->ProjectionY("full_RM_py", 0, -1, "eo"));
     // stability
-    // purity
     TH1 * stability = static_cast<TH1 *>(h_RM->ProjectionX("RM_px", 1, -1, "oe")->Clone("stability"));
+    // purity
     TH1 * purity    = static_cast<TH1 *>(h_RM->ProjectionY("RM_py", 1, -1, "oe")->Clone("purity"   ));
     for (int xbin = 1 ; xbin <= stability->GetNbinsX() ; xbin++)
     {
@@ -410,13 +422,18 @@ TCanvas * make_canvas (TH1 * h_gen,
     int nbins = new_edges.size()-1;
     TH1 * rebinned_gen = h_gen->Rebin(nbins, TString("rebinned_") + h_gen->GetName(), &new_edges[0]),
         * rebinned_rec = h_rec->Rebin(nbins, TString("rebinned_") + h_rec->GetName(), &new_edges[0]);
-    TH2 * rebinned_RM = new TH2D ("rebinned_RM", h_RM->GetTitle(), nbins, &new_edges[0], nbins, &new_edges[0]);
+    TH2 * rebinned_RM = new TH2D ("rebinned_RM", h_RM->GetTitle(), nbins, &new_edges[0], nbins, &new_edges[0]),
+        * semi_rebinned_RM = new TH2D ("semi_rebinned_RM", h_RM->GetTitle(), nbins, h_RM->GetXaxis()->GetXmin(), h_RM->GetXaxis()->GetXmax(), nbins, &new_edges[0]);
     rebinned_RM->SetStats(0);
-    for (int ybin = 0 ; ybin <= h_RM->GetNbinsY()+1 ; ++ybin)
-        for (int xbin = 0 ; xbin <= h_RM->GetNbinsX()+1 ; ++xbin)
-            rebinned_RM->Fill(h_RM->GetXaxis()->GetBinCenter(xbin),
-                              h_RM->GetYaxis()->GetBinCenter(ybin),
-                              h_RM->GetBinContent(xbin, ybin));
+    for (int ybin = 0 ; ybin <= h_RM->GetNbinsY()+1 ; ++ybin) for (int xbin = 0 ; xbin <= h_RM->GetNbinsX()+1 ; ++xbin)
+    {
+        rebinned_RM->Fill(h_RM->GetXaxis()->GetBinCenter(xbin),
+                          h_RM->GetYaxis()->GetBinCenter(ybin),
+                          h_RM->GetBinContent(xbin, ybin));
+        semi_rebinned_RM->Fill(h_RM->GetXaxis()->GetBinCenter(xbin),
+                               h_RM->GetYaxis()->GetBinCenter(ybin),
+                               h_RM->GetBinContent(xbin, ybin));
+    }
 
     // defining canvas
     TCanvas * c = new TCanvas ("canvas");
@@ -427,14 +444,13 @@ TCanvas * make_canvas (TH1 * h_gen,
     c->GetPad(1)->SetLogx();
     c->GetPad(1)->SetLogy();
     c->GetPad(1)->SetLogz();
-    c->GetPad(1)->SetTopMargin(0.01);
-    c->GetPad(1)->SetBottomMargin(0.01);
-    rebinned_RM->GetXaxis()->SetNoExponent();
-    rebinned_RM->GetXaxis()->SetMoreLogLabels();
-    rebinned_RM->GetYaxis()->SetNoExponent();
-    rebinned_RM->GetYaxis()->SetMoreLogLabels();
-    rebinned_RM->DrawCopy("colz");
-    rebinned_RM->Write();
+    c->GetPad(1)->SetTopMargin(0.05);
+    h_RM->GetXaxis()->SetNoExponent();
+    h_RM->GetXaxis()->SetMoreLogLabels();
+    h_RM->GetYaxis()->SetNoExponent();
+    h_RM->GetYaxis()->SetMoreLogLabels();
+    h_RM->DrawCopy("colz");
+    h_RM->Write();
     // TPaveText (Double_t x1, Double_t y1, Double_t x2, Double_t y2, Option_t *option="br")
     TPaveText * RM_text = new TPaveText(0.7,0.2,0.89,0.3, "NBNDC");
     RM_text->SetTextFont(42);
@@ -446,8 +462,7 @@ TCanvas * make_canvas (TH1 * h_gen,
     c->cd(3);
     c->GetPad(3)->SetLogy();
     c->GetPad(3)->SetLogz();
-    c->GetPad(3)->SetTopMargin(0.01);
-    c->GetPad(3)->SetBottomMargin(0.01);
+    c->GetPad(3)->SetTopMargin(0.05);
     h_resolution->DrawCopy("colz");
     h_resolution->Write();
     // TPaveText (Double_t x1, Double_t y1, Double_t x2, Double_t y2, Option_t *option="br")
@@ -490,7 +505,7 @@ TCanvas * make_canvas (TH1 * h_gen,
     c->GetPad(2)->GetPad(2)->SetLogy();
 
     // the following vector will contain all the spectra at hadron level: the generated spectrum and the unfolded spectra
-    vector<TH1 *> unfolded_spectra = make_unfolding(rebinned_RM, rebinned_rec);
+    vector<TH1 *> unfolded_spectra = make_unfolding(rebinned_RM, rebinned_rec, semi_rebinned_RM, h_rec);
 
     rebinned_rec->Scale(1,"width");
     rebinned_gen->Scale(1,"width");
@@ -578,14 +593,14 @@ int main (int argc, char* argv[])
     TFile * f = new TFile ("unfolding.root", "RECREATE");
 
     // parameters 
-    const unsigned long nevents = 1e6;
-    vector<TString> vsampling = {/*"perfect", "uniform",*/ "core"};
-    double N = 1, kL = -1, kR = 1, aL = -1, nL = 1, aR = 1, nR = 1; // TODO: play with this
+    const unsigned long nevents = 1e8;
+    vector<TString> vsampling = {"perfect", "uniform", "core"};
+    double N = 1, kL = -1, kR = 1, aL = -1, nL = 1, aR = 1, nR = 1;
     // my guess: the resolution is fundamentally gaussian, every deviation comes from a bad matching --> to be studied
     vector<double> vmu     ; for (unsigned short i = 0 ; i <= 0 ; i++) vmu     .push_back(i*0.01);
-    vector<double> vsigma  ; for (unsigned short i = 1 ; i <= 2 ; i++) vsigma  .push_back(i*0.02);
-    vector<double> vtau    ; for (unsigned short i = 0 ; i <= 3 ; i++) vtau    .push_back(i*0.002);
-    vector<double> vminSP  ; for (unsigned short i = 6 ; i <= 6 ; i++) vminSP  .push_back(i*0.10);
+    vector<double> vsigma  ; for (unsigned short i = 2 ; i <= 2 ; i++) vsigma  .push_back(i*0.02);
+    vector<double> vtau    ; for (unsigned short i = 0 ; i <= 0 ; i++) vtau    .push_back(i*0.002);
+    vector<double> vminSP  ; for (unsigned short i = 8 ; i <= 8 ; i++) vminSP  .push_back(i*0.10);
     vector<double> triggers; for (unsigned short i = 0 ; i <= 0 ; i++) triggers.push_back(i*  10);
     
     map<TString, double (*)(double)> MC_spectra = {{"flat spectrum", flat_spectrum},
@@ -599,7 +614,7 @@ int main (int argc, char* argv[])
         divider(sampling + " sampling")->Print(sampling + ".pdf"); // frontpage
     }
     vector<double> binning;
-    for (int i = 18 ; i <= 330 ; i++) // TODO
+    for (int i = 18 ; i <= 114 ; i++) // TODO
         binning.push_back(i);
     //// Mikko's binning
     //vector<double> std_binning = {/*0,*/18,21,24,28,32,37,43,49,56,64,74,84,97,114,133,153,174,196,220,245,272,300,330/*,362,395,430,468,507,548,592,638,686,737,790,846,905,967,1032,1101,1172,1248,1327,1410,1497,1588,1684,1784,1890,2000,2116,2238,2366,2500,2640,2787,2941,3103,3273,3450,3637,3832,4037,4252,4477,4713,4961,5220,5492,5777,6076,6389,6717,7000*/}; // std in SMP-j
