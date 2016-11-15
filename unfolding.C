@@ -543,7 +543,7 @@ void draw_response_matrix (TVirtualPad * p,
                  pad_bottom_margin = 0.001,
                  pad_upper_margin = 0.03;
     p_main->SetTicks(1,1);
-    p_main->SetGrid();
+    //p_main->SetGrid();
     p_main->SetRightMargin(pad_right_margin);
     p_main->SetLeftMargin(0);
     p_main->SetTopMargin(pad_upper_margin);
@@ -559,7 +559,7 @@ void draw_response_matrix (TVirtualPad * p,
 
     p->cd();
     p_miss->SetTicks(1,1);
-    p_miss->SetGridy();
+    //p_miss->SetGridy();
     p_miss->SetRightMargin(0.1);
     p_miss->SetLeftMargin(0.5);
     p_miss->SetTopMargin(pad_upper_margin);
@@ -580,7 +580,7 @@ void draw_response_matrix (TVirtualPad * p,
 
     p->cd();
     p_fake->SetTicks(1,1);
-    p_fake->SetGridx();
+    //p_fake->SetGridx();
     p_fake->SetRightMargin(pad_right_margin);
     p_fake->SetLeftMargin(0);
     p_fake->SetTopMargin(0.1);
@@ -683,6 +683,7 @@ TCanvas * make_canvas (TH1 * h_gen,
     cout << "=== Plotting ABPS" << endl;
     c->GetPad(2)->cd(1);
     c->GetPad(2)->GetPad(1)->SetLogx();
+    c->GetPad(2)->GetPad(1)->SetGridx();
     vector<TH1 *> ABPS = make_ABPS(rebinned_RM);
     ABPS.front()->SetStats(0);
     ABPS.front()->Draw("hist");
@@ -710,6 +711,8 @@ TCanvas * make_canvas (TH1 * h_gen,
     c->GetPad(2)->cd(2);
     c->GetPad(2)->GetPad(2)->SetLogx();
     c->GetPad(2)->GetPad(2)->SetLogy();
+    c->GetPad(2)->GetPad(2)->SetGridx();
+    c->GetPad(2)->GetPad(2)->SetTicks();
     //rebinned_RM->Rebin2D(1,2);
     //rebinned_gen->Rebin(2);
 
@@ -755,6 +758,8 @@ TCanvas * make_canvas (TH1 * h_gen,
     {
         c->GetPad(4)->cd(i+1);
         c->GetPad(4)->GetPad(i+1)->SetLogx();
+        c->GetPad(4)->GetPad(i+1)->SetGridx();
+        c->GetPad(4)->GetPad(i+1)->SetTicks();
         TH1D * ratio = static_cast<TH1D*>(numerators[i]->Clone(TString::Format("%s/rec", numerators[i]->GetName())));
         ratio->Divide(rebinned_rec);
         ratio->SetTitle(TString::Format(";;%s", numerators[i]->GetTitle()));
@@ -762,6 +767,7 @@ TCanvas * make_canvas (TH1 * h_gen,
         ratio->GetYaxis()->SetTitleOffset(0.2);
         ratio->GetYaxis()->SetLabelSize(0.1);
         ratio->SetNdivisions(304, "Y");
+        ratio->SetTickLength (0.1, "X");
         ratio->SetStats(0);
         ratio->GetYaxis()->SetRangeUser(0,2);
         ratio->DrawCopy();
@@ -802,7 +808,7 @@ int main (int argc, char* argv[])
     TApplication * rootapp = new TApplication ("unfolding", &argc, argv);
     TFile * f = new TFile ("unfolding.root", "RECREATE");
 
-    // parameters 
+    // parameters TODO (don't forget to modify the path in the output root file
     const unsigned long nevents = 1e7;
     vector<TString> vsampling = {"perfect", "uniform", "core"};
     double N = 1, kL = -1, kR = 1, aL = -1, nL = 1, aR = 1, nR = 1;
