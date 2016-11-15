@@ -188,35 +188,16 @@ void make_RM (TH2 * h_RM,
     }
     h_RM->Scale(1./h_RM->Integral());
 
-    //// get nonnegative minimum
-    //double minimum = h_RM->GetMaximum(), maximum = h_RM->GetMinimum();
-    //for (unsigned short ibin = 1 ; ibin <= h_RM->GetNbinsX() ; ibin++) for (unsigned short jbin = 1 ; jbin <= h_RM->GetNbinsY() ; jbin++)
-    //{
-    //    const double current_content = h_RM->GetBinContent(ibin,jbin);
-    //    if (current_content > 0 && current_content < minimum) minimum = current_content;
-    //    if (current_content > 0 && current_content > maximum) maximum = current_content;
-    //}
-    //h_RM->SetMinimum(minimum);
-    //h_RM->SetMaximum(maximum);
     h_RM->SetMinimum(get_nonnegative_minimum(h_RM, true));
+    h_RM->SetNdivisions(304, "Z");
     h_RM->GetXaxis()->SetNoExponent();
     h_RM->GetXaxis()->SetMoreLogLabels();
     h_RM->GetYaxis()->SetNoExponent();
     h_RM->GetYaxis()->SetMoreLogLabels();
     h_RM->SetStats(0);
 
-    //// get nonnegative minimum
-    //minimum = h_resolution->GetMaximum(); maximum = h_resolution->GetMaximum(); // initial value
-    //for (unsigned short ibin = 0 ; ibin <= h_resolution->GetNbinsX() ; ibin++) for (unsigned short jbin = 1 ; jbin <= h_resolution->GetNbinsY() ; jbin++)
-    //{
-    //    const double current_content = h_resolution->GetBinContent(ibin,jbin);
-    //    if (current_content > 0 && current_content < minimum) minimum = current_content;
-    //    if (current_content > 0 && current_content > maximum) maximum = current_content;
-    //    if (current_content < 0) throw TString("Negative bin content!!");
-    //}
-    //h_resolution->SetMinimum(minimum);
-    //h_resolution->SetMaximum(maximum);
     h_resolution->SetMinimum(get_nonnegative_minimum(h_resolution, true));
+    h_resolution->SetNdivisions(304, "Z");
     h_resolution->GetYaxis()->SetNoExponent();
     h_resolution->GetYaxis()->SetMoreLogLabels();
     h_resolution->SetStats(0);
@@ -684,6 +665,7 @@ TCanvas * make_canvas (TH1 * h_gen,
     c->GetPad(2)->cd(1);
     c->GetPad(2)->GetPad(1)->SetLogx();
     c->GetPad(2)->GetPad(1)->SetGridx();
+    c->GetPad(2)->GetPad(1)->SetTicks();
     vector<TH1 *> ABPS = make_ABPS(rebinned_RM);
     ABPS.front()->SetStats(0);
     ABPS.front()->Draw("hist");
