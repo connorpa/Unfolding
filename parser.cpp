@@ -369,15 +369,6 @@ int main (int argc, char * argv[])
                     h_gen->Write();
                     h_rec->Write();
 
-                    c = new TCanvas ();
-                    c->SetLogx();
-                    c->SetLogy();
-                    h_gen->GetYaxis()->SetMoreLogLabels();
-                    h_gen->Draw();
-                    h_rec->Draw("same");
-                    c->Print((filename + ')').c_str());
-                    return EXIT_SUCCESS;
-
                     // loop on sampling methods 
                     for (const string& sampling: v_sampling)
                     {

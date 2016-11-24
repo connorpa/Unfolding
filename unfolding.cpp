@@ -203,7 +203,6 @@ void make_measurement (TH1 * h_gen,
         // truth
         double pt_gen = minpt + r.Rndm()*(maxpt-minpt),
                weight = xsec->Eval(pt_gen);
-        cout << "weight=" << weight << endl;
         h_gen->Fill(pt_gen, weight);
         // measurement
         double x, pt_rec;

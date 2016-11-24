@@ -6,7 +6,7 @@ double Spectrum (double *x, double *p)
 {
     const double X = *x;
     if (X <= 0) return 0;
-    double sum;
+    double sum = 0;
     for (short i = 0 ; i < NTERMS ; i++)
         sum += p[i] / pow(X, i);
     return sum;
@@ -21,7 +21,7 @@ TF1 * spectrum ()
     c->SetGridx();
     c->SetGridy();
     c->SetLogy();
-    TF1 * spectrum = new TF1 ("spectrum", Spectrum, 0, 1, 100);
+    TF1 * spectrum = new TF1 ("spectrum", Spectrum, 1, 100, NTERMS);
     spectrum->SetParameters(0,0,0,0,1,0,0,0,0,0);
     spectrum->Draw();
     return spectrum;
