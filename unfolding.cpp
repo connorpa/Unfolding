@@ -28,45 +28,10 @@
 #include <RooUnfoldInvert.h>
 #include <RooUnfoldResponse.h>
 #include <RooUnfoldTUnfold.h>
+// proper header
+#include "unfolding.h"
 
 using namespace std;
-
-double Resolution (double * x, double * p);
-
-TCanvas * divider (const vector<TString> lines, Color_t fillcolor = kGray)
-{
-    TCanvas * c = new TCanvas("divider", "Unfolding");
-    c->Draw();
-    c->cd();
-    // TPaveText (Double_t x1, Double_t y1, Double_t x2, Double_t y2, Option_t *option="br")
-    TPaveText * pave  = new TPaveText(0.2, 0.2 , 0.8, 0.8, "NBNDC");
-    pave->SetFillColor(fillcolor);
-    pave->SetTextFont(42);
-    for (const TString& line: lines)
-        pave->AddText(line);
-    pave->Draw();
-    return c;
-}
-TCanvas * divider (const TString line, Color_t fillcolor = kGray)
-{
-    vector<TString> lines = {line};
-    return divider(lines, fillcolor);
-}
-
-double flat_spectrum(double pt)
-{
-    return 1;
-}
-double falling_spectrum(double pt)
-{
-    if (pt == 0) return 0;
-    return pow(pt,-4);
-}
-double even_more_falling_spectrum(double pt)
-{
-    if (pt == 0) return 0;
-    return pow(pt,-6);
-}
 
 double get_nonnegative_minimum (const TH1 * h, const bool include_underflow = false)
 {
@@ -104,9 +69,25 @@ double get_nonnegative_minimum (const TH1 * h, const bool include_underflow = fa
     return minimum;
 }
 
+//double flat_spectrum(double pt)
+//{
+//    return 1;
+//}
+//double falling_spectrum(double pt)
+//{
+//    if (pt == 0) return 0;
+//    return pow(pt,-4);
+//}
+//double even_more_falling_spectrum(double pt)
+//{
+//    if (pt == 0) return 0;
+//    return pow(pt,-6);
+//}
+
 void make_RM (TH2 * h_RM,
               TH2 * h_resolution,
-              double (* xsec)(double),
+              TF1 * xsec,
+              //double (* xsec)(double),
               double minpt,
               double maxpt,
               TF1 * f_resolution,
@@ -131,7 +112,7 @@ void make_RM (TH2 * h_RM,
             double ybinwidth = h_RM->GetYaxis()->GetBinWidth(ybin);
             for (double pt_gen = h_RM->GetYaxis()->GetBinLowEdge(ybin)+1 ; pt_gen <= h_RM->GetYaxis()->GetBinUpEdge(ybin) ; pt_gen += step)
             {
-                double current_xsec = xsec(pt_gen);
+                double current_xsec = xsec->Eval(pt_gen);
                 for (int xbin = 1 ; xbin <= h_RM->GetNbinsX() ; xbin++)
                 {
                     double xbinwidth = h_RM->GetXaxis()->GetBinWidth(xbin);
@@ -156,7 +137,7 @@ void make_RM (TH2 * h_RM,
         {
             // pick up a generated value and fill it with the weight equal to the cross section
             double pt_gen = minpt + r.Rndm()*(maxpt-minpt),
-                   weight = xsec(pt_gen);
+                   weight = xsec->Eval(pt_gen);
             // determine pt_rec and x according to sampling method
             double pt_rec, x;
             if (kDiagonalOnly)
@@ -170,7 +151,7 @@ void make_RM (TH2 * h_RM,
                 x = (pt_gen-pt_rec)/pt_gen;
                 if (x < minresolution)
                     continue; // to mimick core sampling
-                else if (x > maxresolution) // this should normally never happen if maxresolution is correctly set to 1
+                else if (x > maxresolution) // this should normally never happen
                     throw TString::Format("pt_gen=%f && pt_rec=%f => x=%f", pt_gen, pt_rec, x);
                 weight *= f_resolution->Eval(x);
             }
@@ -205,7 +186,8 @@ void make_RM (TH2 * h_RM,
 
 void make_measurement (TH1 * h_gen,
                        TH1 * h_rec,
-                       double (* xsec)(double),
+                       TF1 * xsec,
+                       //double (* xsec)(double),
                        double minpt,
                        double maxpt,
                        TF1 * f_resolution,
@@ -220,7 +202,8 @@ void make_measurement (TH1 * h_gen,
     {
         // truth
         double pt_gen = minpt + r.Rndm()*(maxpt-minpt),
-               weight = xsec(pt_gen);
+               weight = xsec->Eval(pt_gen);
+        cout << "weight=" << weight << endl;
         h_gen->Fill(pt_gen, weight);
         // measurement
         double x, pt_rec;
@@ -307,21 +290,26 @@ vector<double> find_binning (TH2 * h_RM, float minimal_stability, float minimal_
 vector<TH1 *> make_unfolding (TH2 * rebinned_RM,
                               TH1 * rebinned_rec,
                               TH2 * semi_rebinned_RM,
-                              TH1 * semi_rebinned_rec)
-{ // TODO: see whether the binning could not be different for the different cases
-    vector<TH1 *> unfolded_spectra;
+                              TH1 * semi_rebinned_rec,
+                              vector<UnfoldingParameters *> v_parameters)
+{
+    cout << "=== Unfolding:\n>>>Preparing RM" << endl;
 
-    TH1D * semi_rebinned_RM_projx = semi_rebinned_RM->ProjectionX("measurement", 0, -1, "oe"),
-         * semi_rebinned_RM_projy = semi_rebinned_RM->ProjectionY("truth"      , 0, -1, "oe");
-    TH2D * semi_rebinned_RM_noUnderflow = static_cast<TH2D *>(semi_rebinned_RM->Clone("RM_noUnderflow"));
+    cout << ">>> Semi-rebinned RM" << endl;
+    TH1D * semi_rebinned_RM_projx = semi_rebinned_RM->ProjectionX("semi_rebinned_measurement", 0, -1, "oe"),
+         * semi_rebinned_RM_projy = semi_rebinned_RM->ProjectionY("semi_rebinned_truth"      , 0, -1, "oe");
+    TH2D * semi_rebinned_RM_noUnderflow = static_cast<TH2D *>(semi_rebinned_RM->Clone("semi_rebinned_RM_noUnderflow"));
     for (int xbin = 0 ; xbin < semi_rebinned_RM_noUnderflow->GetNbinsX() ; xbin++) semi_rebinned_RM_noUnderflow->SetBinContent(xbin, 0, 0);
     for (int ybin = 0 ; ybin < semi_rebinned_RM_noUnderflow->GetNbinsY() ; ybin++) semi_rebinned_RM_noUnderflow->SetBinContent(0, ybin, 0);
+    RooUnfoldResponse * semi_rebinned_RU_response = new RooUnfoldResponse(semi_rebinned_RM_projx, semi_rebinned_RM_projy, semi_rebinned_RM_noUnderflow);
 
+    cout << ">>> Rebinned RM" << endl;
     TH1D * rebinned_RM_projx = rebinned_RM->ProjectionX("rebinned_measurement", 0, -1, "oe"),
          * rebinned_RM_projy = rebinned_RM->ProjectionY("rebinned_truth"      , 0, -1, "oe");
-    TH2D * rebinned_RM_noUnderflow = static_cast<TH2D *>(rebinned_RM->Clone("RM_noUnderflow"));
+    TH2D * rebinned_RM_noUnderflow = static_cast<TH2D *>(rebinned_RM->Clone("rebinned_RM_noUnderflow"));
     for (int xbin = 0 ; xbin < rebinned_RM_noUnderflow->GetNbinsX() ; xbin++) rebinned_RM_noUnderflow->SetBinContent(xbin, 0, 0);
     for (int ybin = 0 ; ybin < rebinned_RM_noUnderflow->GetNbinsY() ; ybin++) rebinned_RM_noUnderflow->SetBinContent(0, ybin, 0);
+    RooUnfoldResponse * rebinned_RU_response = new RooUnfoldResponse(rebinned_RM_projx, rebinned_RM_projy, rebinned_RM_noUnderflow);
 
     //RooUnfoldResponse (const TH1* measured, const TH1* truth, const TH2* response, const char* name= 0, const char* title= 0);  // create from already-filled histograms
     // Set up from already-filled histograms.
@@ -331,42 +319,72 @@ vector<TH1 *> make_unfolding (TH2 * rebinned_RM,
     // in "truth" for unmeasured events (inefficiency).
     // "measured" and/or "truth" can be specified as 0 (1D case only) or an empty histograms (no entries) as a shortcut
     // to indicate, respectively, no fakes and/or no inefficiency.
-    cout << "=== Unfolding:\n>>>Preparing RM" << endl;
 
-    RooUnfoldResponse * RU_response = new RooUnfoldResponse(rebinned_RM_projx, rebinned_RM_projy, rebinned_RM_noUnderflow);
-    RooUnfold * RU_unfolding;
-    // bin by bin
-    cout << ">>> Bin-by-bin unfolding" << endl;
-    RU_unfolding = new RooUnfoldBinByBin (RU_response, rebinned_rec, "binbybin");
-    unfolded_spectra.push_back(static_cast<TH1D*>(RU_unfolding->Hreco()->Clone("BinByBin")));
-    unfolded_spectra.back()->SetTitle("BinByBin");
-    // inversion
-    cout << ">>> matrix-inversion unfolding" << endl;
-    RU_unfolding = new RooUnfoldInvert (RU_response, rebinned_rec, "inv");
-    unfolded_spectra.push_back(static_cast<TH1D*>(RU_unfolding->Hreco()->Clone("Inverse")));
-    unfolded_spectra.back()->SetTitle("Inverse");
-    // SVD
-    cout << ">>> SVD unfolding" << endl;
-    RU_unfolding = new RooUnfoldSvd (RU_response, rebinned_rec, 20, "svd");
-    unfolded_spectra.push_back(static_cast<TH1D*>(RU_unfolding->Hreco()->Clone("SVD")));
-    unfolded_spectra.back()->SetTitle("SVD");
-    // Bayes (normal binning)
-    cout << ">>> Bayes unfolding (same binning)" << endl;
-    RU_unfolding = new RooUnfoldBayes (RU_response, rebinned_rec, 4, "bayes");
-    unfolded_spectra.push_back(static_cast<TH1D*>(RU_unfolding->Hreco()->Clone("Bayes")));
-    unfolded_spectra.back()->SetTitle("Bayes");
+    cout << "=== Unfolding:\n>>>Applying unfolding" << endl;
+    vector<TH1 *> unfolded_spectra;
+    for (UnfoldingParameters * parameters: v_parameters)
+    {
+        TString title;
+        RooUnfold * RU_unfolding;
 
-    RU_response = new RooUnfoldResponse(semi_rebinned_RM_projx, semi_rebinned_RM_projy, semi_rebinned_RM_noUnderflow); // TODO?
-    // Bayes (fine binning)
-    cout << ">>> Bayes unfolding (fine binning)" << endl;
-    RU_unfolding = new RooUnfoldBayes (RU_response, semi_rebinned_rec, 4, "bayes_fine");
-    unfolded_spectra.push_back(static_cast<TH1D*>(RU_unfolding->Hreco()->Clone("Bayes_Fine")));
-    unfolded_spectra.back()->SetTitle("Bayes++");
-    // TUnfold
-    cout << ">>> TUnfold unfolding" << endl;
-    RU_unfolding = new RooUnfoldTUnfold (RU_response, semi_rebinned_rec, TUnfold::kRegModeDerivative, "tu");
-    unfolded_spectra.push_back(static_cast<TH1D*>(RU_unfolding->Hreco()->Clone("TUnfold")));
-    unfolded_spectra.back()->SetTitle("TUnfold");
+        switch (parameters->type)
+        {
+            case UnfoldingParameters::kBinByBin:
+            {
+                cout << ">> Bin-by-bin unfolding" << endl;
+                title = "Bin by bin";
+                RU_unfolding = new RooUnfoldBinByBin (rebinned_RU_response, rebinned_rec, "binbybin");
+                break;
+            }
+            case UnfoldingParameters::kInversion:
+            {
+                cout << ">> matrix-inversion unfolding" << endl;
+                title = "Inversion";
+                RU_unfolding = new RooUnfoldInvert (rebinned_RU_response, rebinned_rec, "inv");
+                break;
+            }
+            case UnfoldingParameters::kSVD:
+            {
+                cout << ">> SVD unfolding" << endl;
+                UnfoldingParametersSVD * svd_parameters = static_cast<UnfoldingParametersSVD *>(parameters);
+                title = TString::Format("SVD (k=%d)", svd_parameters->kreg);
+                RU_unfolding = new RooUnfoldSvd (rebinned_RU_response, rebinned_rec, svd_parameters->kreg, "svd");
+                break;
+            }
+            case UnfoldingParameters::kBayes:
+            {
+                UnfoldingParametersBayes * bayes_parameters = static_cast<UnfoldingParametersBayes *>(parameters);
+                title = TString::Format("Bayes (n=%d)", bayes_parameters->niterations); // TODO: include binning scheme?
+                switch (bayes_parameters->rm_type)
+                {
+                    case UnfoldingParametersBayes::kSquare:
+                        cout << ">> Bayes unfolding (squared RM)" << endl;
+                        RU_unfolding = new RooUnfoldBayes (rebinned_RU_response, rebinned_rec, bayes_parameters->niterations, "bayes");
+                        break;
+                    case UnfoldingParametersBayes::kFine:
+                        cout << ">> Bayes unfolding (fine binning)" << endl;
+                        RU_unfolding = new RooUnfoldBayes (semi_rebinned_RU_response, semi_rebinned_rec, bayes_parameters->niterations, "bayes");
+                        break;
+                    default:
+                        throw string("Unknown Bayes parameters.");
+                }
+                break;
+            }
+            case UnfoldingParameters::kTUnfold:
+            {
+                cout << ">>> TUnfold unfolding" << endl;
+                UnfoldingParametersTUnfold * tunfold_parameters = static_cast<UnfoldingParametersTUnfold *>(parameters);
+                title = "TUnfold"; // TODO: include regularisation scheme?
+                RU_unfolding = new RooUnfoldTUnfold (semi_rebinned_RU_response, semi_rebinned_rec, tunfold_parameters->regularisation, "tu");
+                break;
+            }
+            default:
+                throw string("Unknown unfolding type.");
+        }
+        unfolded_spectra.push_back(RU_unfolding->Hreco()); // TODO: name? title?
+        unfolded_spectra.back()->SetTitle(title);
+        delete RU_unfolding; // TODO?
+    }
 
     vector<Color_t> colours = {kBlue, kMagenta+2, kOrange+7, kGreen+3, kCyan+2, kAzure+3};
     for (unsigned short i = 0 ; i < unfolded_spectra.size() ; i++)
@@ -374,6 +392,15 @@ vector<TH1 *> make_unfolding (TH2 * rebinned_RM,
         unfolded_spectra[i]->SetLineColor  (colours[i%colours.size()]);
         unfolded_spectra[i]->SetMarkerColor(colours[i%colours.size()]);
     }
+
+    delete semi_rebinned_RU_response;
+    delete semi_rebinned_RM_projx;
+    delete semi_rebinned_RM_projy;
+    delete semi_rebinned_RM_noUnderflow;
+    delete rebinned_RU_response;
+    delete rebinned_RM_projx;
+    delete rebinned_RM_projy;
+    delete rebinned_RM_noUnderflow;
 
     return unfolded_spectra;
 }
@@ -435,14 +462,7 @@ vector<TH1 *> make_ABPS (TH2 * h_RM)
 }
 
 void draw_response_matrix (TVirtualPad * p,
-                           TH2 * RM/*,
-                           const double & xmin = DEFAULT_PTMIN,
-                           const double & xmax = DEFAULT_PTMAX,
-                           const double & ymin = DEFAULT_PTMIN,
-                           const double & ymax = DEFAULT_PTMAX,
-                           const bool & logx = true,
-                           const bool & logy = true,
-                           const bool & logz = true*/)
+                           TH2 * RM)
 {
     const unsigned short nbinsx = RM->GetNbinsX(),
                          nbinsy = RM->GetNbinsY();
@@ -450,8 +470,6 @@ void draw_response_matrix (TVirtualPad * p,
     RM->SetTitle(";p_{T}^{rec};p_{T}^{gen};N");
     RM->GetXaxis()->SetLabelSize(0);
     RM->GetYaxis()->SetLabelSize(0);
-    //RM->GetXaxis()->SetRangeUser(xmin,xmax);
-    //RM->GetYaxis()->SetRangeUser(ymin,ymax);
 
     // fake
     const string fake_name = string("fake_") + RM->GetName();
@@ -527,7 +545,6 @@ void draw_response_matrix (TVirtualPad * p,
                  pad_bottom_margin = 0.001,
                  pad_upper_margin = 0.03;
     p_main->SetTicks(1,1);
-    //p_main->SetGrid();
     p_main->SetRightMargin(pad_right_margin);
     p_main->SetLeftMargin(0);
     p_main->SetTopMargin(pad_upper_margin);
@@ -543,7 +560,6 @@ void draw_response_matrix (TVirtualPad * p,
 
     p->cd();
     p_miss->SetTicks(1,1);
-    //p_miss->SetGridy();
     p_miss->SetRightMargin(0.1);
     p_miss->SetLeftMargin(0.5);
     p_miss->SetTopMargin(pad_upper_margin);
@@ -554,7 +570,6 @@ void draw_response_matrix (TVirtualPad * p,
     p_miss->cd();
     miss->GetYaxis()->SetMoreLogLabels();
     miss->GetYaxis()->SetNoExponent();
-    //miss->GetYaxis()->SetRangeUser(ymin,ymax);
     miss->GetYaxis()->SetLabelSize(0.15);
     miss->GetYaxis()->SetLabelFont(42);
     miss->GetYaxis()->SetTitleSize(0.2);
@@ -564,7 +579,6 @@ void draw_response_matrix (TVirtualPad * p,
 
     p->cd();
     p_fake->SetTicks(1,1);
-    //p_fake->SetGridx();
     p_fake->SetRightMargin(pad_right_margin);
     p_fake->SetLeftMargin(0);
     p_fake->SetTopMargin(0.1);
@@ -603,8 +617,9 @@ TCanvas * make_canvas (TH1 * h_gen,
                        vector<double> new_edges,
                        TString true_xsec,
                        TString MC_xsec,
-                       vector<TString> parameters,
-                       vector<TString> requirements)
+                       vector<UnfoldingParameters *> v_parameters)//,
+                       //vector<TString> parameters,
+                       //vector<TString> requirements)
 {
     int nbins = new_edges.size()-1;
     TH1 * rebinned_gen = h_gen->Rebin(nbins, TString("rebinned_") + h_gen->GetName(), &new_edges[0]),
@@ -626,25 +641,6 @@ TCanvas * make_canvas (TH1 * h_gen,
     TCanvas * c = new TCanvas ("canvas");
     c->Divide(2,2); // RM, resolution, ABSP/pt spectra, ratios
 
-    //// TEMP
-    //c->cd(1);
-    //c->GetPad(1)->SetLogx();
-    //c->GetPad(1)->SetLogy();
-    //c->GetPad(1)->SetLogz();
-    //h_RM->Draw("colz");
-    //c->cd(2);
-    //c->GetPad(2)->SetLogx();
-    //c->GetPad(2)->SetLogy();
-    //c->GetPad(2)->SetLogz();
-    //rebinned_RM->Draw("colz");
-    //c->cd(3);
-    //c->GetPad(3)->SetLogx();
-    //c->GetPad(3)->SetLogy();
-    //c->GetPad(3)->SetLogz();
-    //semi_rebinned_RM->Draw("colz");
-    //return c;
-    //// TEMP
-
     cout << "=== Plotting RM" << endl;
     c->cd(1);
     h_RM->Write();
@@ -664,13 +660,13 @@ TCanvas * make_canvas (TH1 * h_gen,
     c->GetPad(3)->SetTopMargin(0.05);
     h_resolution->DrawCopy("colz");
     h_resolution->Write();
-    // TPaveText (Double_t x1, Double_t y1, Double_t x2, Double_t y2, Option_t *option="br")
-    TPaveText * resolution_text  = new TPaveText(0.7, 0.6 , 0.89, 0.89, "NBNDC");
-    resolution_text->SetFillColorAlpha(0,0);
-    resolution_text->SetTextFont(42);
-    for (const TString& parameter: parameters)
-        resolution_text->AddText(parameter);
-    resolution_text->Draw();
+    //// TPaveText (Double_t x1, Double_t y1, Double_t x2, Double_t y2, Option_t *option="br") // TODO
+    //TPaveText * resolution_text  = new TPaveText(0.7, 0.6 , 0.89, 0.89, "NBNDC");
+    //resolution_text->SetFillColorAlpha(0,0);
+    //resolution_text->SetTextFont(42);
+    //for (const TString& parameter: parameters)
+    //    resolution_text->AddText(parameter);
+    //resolution_text->Draw();
 
     c->cd(2);
     c->GetPad(2)->Divide(1,2, 0);
@@ -689,14 +685,14 @@ TCanvas * make_canvas (TH1 * h_gen,
         ABPS[i]->Write();
     }
     c->GetPad(2)->GetPad(1)->BuildLegend(0.4,0.2,0.6,0.5);
-    // TPaveText (Double_t x1, Double_t y1, Double_t x2, Double_t y2, Option_t *option="br")
-    TPaveText * ABPS_text  = new TPaveText(0.6, 0.25, 0.89, 0.45, "NBNDC");
-    ABPS_text->SetFillColorAlpha(0,0);
-    ABPS_text->SetTextFont(42);
-    for (const TString& requirement: requirements)
-        ABPS_text->AddText(requirement);
-    ABPS_text->Draw();
-    c->GetPad(2)->GetPad(1)->RedrawAxis();
+    //// TPaveText (Double_t x1, Double_t y1, Double_t x2, Double_t y2, Option_t *option="br") // TODO
+    //TPaveText * ABPS_text  = new TPaveText(0.6, 0.25, 0.89, 0.45, "NBNDC");
+    //ABPS_text->SetFillColorAlpha(0,0);
+    //ABPS_text->SetTextFont(42);
+    //for (const TString& requirement: requirements)
+    //    ABPS_text->AddText(requirement);
+    //ABPS_text->Draw();
+    //c->GetPad(2)->GetPad(1)->RedrawAxis();
 
     pair<TH1 *, TH1 *> miss_and_fake = make_miss_fake(rebinned_RM, rebinned_gen, rebinned_rec);
 
@@ -708,8 +704,9 @@ TCanvas * make_canvas (TH1 * h_gen,
     c->GetPad(2)->GetPad(2)->SetTicks();
 
     // the following vector will contain all the spectra at hadron level: the generated spectrum and the unfolded spectra
-    vector<TH1 *> unfolded_spectra = make_unfolding(rebinned_RM, rebinned_rec, semi_rebinned_RM, h_rec);
+    vector<TH1 *> unfolded_spectra = make_unfolding(rebinned_RM, rebinned_rec, semi_rebinned_RM, h_rec, v_parameters);
 
+    rebinned_rec->GetYaxis()->SetMoreLogLabels();
     rebinned_rec->Scale(1,"width");
     rebinned_gen->Scale(1,"width");
     rebinned_rec->DrawCopy();
@@ -765,12 +762,12 @@ TCanvas * make_canvas (TH1 * h_gen,
         delete ratio;
     }
 
-    delete rebinned_gen;
-    delete rebinned_rec;
-    delete rebinned_RM;
-    delete h_resolution;
-    delete miss_and_fake.first ;
-    delete miss_and_fake.second;
+    //delete rebinned_gen;
+    //delete rebinned_rec;
+    //delete rebinned_RM;
+    //delete h_resolution;
+    //delete miss_and_fake.first ;
+    //delete miss_and_fake.second;
     for (auto& unfolded_spectrum: unfolded_spectra)
         delete unfolded_spectrum;
 
@@ -787,130 +784,131 @@ TCanvas * make_canvas (TH1 * h_gen,
     return c;
 }
 
-int main (int argc, char* argv[])
-{
-    gROOT->SetBatch();
-    gStyle->SetOptTitle(0);
-    TH1D::SetDefaultSumw2(true); // correct error computation
-    TColor::CreateColorWheel();
-
-    // declaring TApplication (needed to use the full power of Root as a library)
-    TApplication * rootapp = new TApplication ("unfolding", &argc, argv);
-    TFile * f = new TFile ("unfolding.root", "RECREATE");
-
-    // parameters TODO (don't forget to modify the path in the output root file
-    const unsigned long nevents = 4e7;
-    vector<TString> vsampling = {"perfect", "uniform", "core"};
-    double N = 1, kL = -1, kR = 1, aL = -1, nL = 1, aR = 1, nR = 1;
-    // my guess: the resolution is fundamentally gaussian, every deviation comes from a bad matching --> to be studied
-    vector<double> vmu     ; for (unsigned short i = 0 ; i <= 1 ; i++) vmu     .push_back(i*0.01);
-    vector<double> vsigma  ; for (unsigned short i = 1 ; i <= 3 ; i++) vsigma  .push_back(i*0.02);
-    vector<double> vtau    ; for (unsigned short i = 0 ; i <= 1 ; i++) vtau    .push_back(i*0.01);
-    vector<double> vminSP  ; for (unsigned short i = 4 ; i <= 9 ; i++) vminSP  .push_back(i*0.10);
-    vector<double> triggers; for (unsigned short i = 0 ; i <= 1 ; i++) triggers.push_back(i*  30);
-    
-    map<TString, double (*)(double)> MC_spectra = {{"flat spectrum", flat_spectrum},
-                                                   {"#frac{1}{p_{T}^{4}}", falling_spectrum},
-                                                   {"#frac{1}{p_{T}^{6}}", even_more_falling_spectrum}};
-
-    // open PDF files for the different samplings
-    for (const TString& sampling: vsampling)
-    {
-        (new TCanvas (sampling))->Print(sampling + ".pdf[");
-        divider(sampling + " sampling")->Print(sampling + ".pdf"); // frontpage
-    }
-    vector<double> binning;
-    for (int i = 18 ; i <= 330 ; i++) // TODO
-        binning.push_back(i);
-    //// Mikko's binning
-    //vector<double> std_binning = {/*0,*/18,21,24,28,32,37,43,49,56,64,74,84,97,114,133,153,174,196,220,245,272,300,330/*,362,395,430,468,507,548,592,638,686,737,790,846,905,967,1032,1101,1172,1248,1327,1410,1497,1588,1684,1784,1890,2000,2116,2238,2366,2500,2640,2787,2941,3103,3273,3450,3637,3832,4037,4252,4477,4713,4961,5220,5492,5777,6076,6389,6717,7000*/}; // std in SMP-j
-    //// regular binning
-    //vector<double> constant_binwidth_binning(binning.size()); // making binning in similar range but with constant binwidth
-    //for (size_t i = 0 ; i < binning.size() ; i++) constant_binwidth_binning[i] = i*binning.back()/binning.size();
-
-    for (const double& trigger: triggers) for (const double& minSP: vminSP) for (const double& mu: vmu) for (const double& sigma: vsigma) for (const double& tau: vtau) for (auto& MC_spectrum: MC_spectra)
-    {
-        cout << "================================================================================"
-             << "\nParameters:"
-             << "\n\tMC spectrum = " << MC_spectrum.first
-             << "\n\tmin stability & purity = " << minSP 
-             << "\n\tnevents = " << nevents << endl;
-        vector<TString> parameterisation = {TString::Format("#mu=%f",mu), TString::Format("#sigma=%f", sigma), TString::Format("#tau=%f", tau)},
-                        requirements     = {TString::Format("minSP=%f",minSP), TString::Format("efficient trigger from %f", trigger)};
-
-        TString dirname = MC_spectrum.first + "_" + TString::Format("_trigger%f_minSP%f_mu%f_sigma%f_tau%f", trigger, minSP, mu, sigma, tau);
-        dirname.ReplaceAll(".", "p");
-        dirname.ReplaceAll(" ", "_");
-        dirname.ReplaceAll("-", "_");
-        dirname.ReplaceAll("#", "");
-        dirname.ReplaceAll("{", "");
-        dirname.ReplaceAll("}", "");
-        dirname.ReplaceAll("^", "");
-        f->mkdir(dirname)->cd();
-
-        cout << "=== Defining resolution function (used only if sigma different from 0)" << endl;
-        TF1 * f_resolution = new TF1 ("resolution", Resolution, -1, 1, 10);
-        f_resolution->SetParameters(N, mu, sigma, tau, kL, kR, aL, nL, aR, nR);
-        cout << "Parameters:"
-             << "\nN=" << N
-             << "\nmu=" << mu
-             << "\nsigma=" << sigma
-             << "\ntau=" << tau
-             << "\nkL=" << kL
-             << "\nkR=" << kR
-             << "\naL=" << aL
-             << "\nnL=" << nL
-             << "\naR=" << aR
-             << "\nnR=" << nR
-             <<  endl;
-
-        cout << "=== Defining gen and rec histograms" << endl;
-        TH1D * h_gen = new TH1D ("gen", "Truth"      , binning.size()-1, &binning[0]),
-             * h_rec = new TH1D ("rec", "Measurement", binning.size()-1, &binning[0]);
-        const double minpt = 0, maxpt = h_gen->GetXaxis()->GetXmax()*1.1;
-        make_measurement(h_gen, h_rec, falling_spectrum, minpt, maxpt, f_resolution, nevents, trigger);
-
-        for (TString sampling: vsampling)
-        {
-            TCanvas * c;
-            try
-            {
-                cout << "=== Defining RM and resolution histograms" << endl;
-                TH2 * h_RM = new TH2D ("RM", "RM", binning.size()-1, &binning[0], binning.size()-1, &binning[0]),
-                    * h_resolution = new TH2D("resolution", "resolution", 41, -1, 1, binning.size()-1, &binning[0]);
-
-                cout << "=== Filling histograms" << endl;
-                make_RM(h_RM, h_resolution, MC_spectrum.second, minpt, maxpt, f_resolution, nevents, sampling);
-
-                cout << "=== Rebinning" << endl;
-                vector<double> new_edges = find_binning(h_RM, minSP, minSP);
-
-                cout << "=== Making canvas" << endl;
-                c = make_canvas(h_gen, h_rec, h_RM, h_resolution, new_edges, /*true*/ "#frac{1}{p_{T}^{4}}", /*MC*/ MC_spectrum.first, parameterisation, requirements);
-            }
-            catch (TString msg)
-            {
-                vector<TString> pave = {msg, MC_spectrum.first};
-                pave.insert(end(pave), begin(parameterisation), end(parameterisation));
-                c = divider(pave, kWhite);
-                cout << "An error was thrown! Continuing." << endl;
-            }
-            if (c != nullptr)
-            {
-                c->Print(sampling + ".pdf");
-                delete c;
-            }
-        }
-    }
-    for (const TString& sampling: vsampling)
-        (new TCanvas (sampling))->Print(sampling + ".pdf]");
-
-    // ending
-    f->Close();
-    if (gROOT->IsBatch())
-        rootapp->Terminate();
-    else
-        rootapp->Run();
-    return EXIT_SUCCESS;
-}
-
+//#ifdef NOPARSER
+//int main (int argc, char* argv[])
+//{
+//    gROOT->SetBatch();
+//    gStyle->SetOptTitle(0);
+//    TH1D::SetDefaultSumw2(true); // correct error computation
+//    TColor::CreateColorWheel();
+//
+//    // declaring TApplication (needed to use the full power of Root as a library)
+//    TApplication * rootapp = new TApplication ("unfolding", &argc, argv);
+//    TFile * f = new TFile ("unfolding.root", "RECREATE");
+//
+//    // parameters TODO (don't forget to modify the path in the output root file
+//    const unsigned long nevents = 4e7;
+//    vector<TString> vsampling = {"perfect", "uniform", "core"};
+//    double N = 1, kL = -1, kR = 1, aL = -1, nL = 1, aR = 1, nR = 1;
+//    // my guess: the resolution is fundamentally gaussian, every deviation comes from a bad matching --> to be studied
+//    vector<double> vmu     ; for (unsigned short i = 0 ; i <= 1 ; i++) vmu     .push_back(i*0.01);
+//    vector<double> vsigma  ; for (unsigned short i = 1 ; i <= 3 ; i++) vsigma  .push_back(i*0.02);
+//    vector<double> vtau    ; for (unsigned short i = 0 ; i <= 1 ; i++) vtau    .push_back(i*0.01);
+//    vector<double> vminSP  ; for (unsigned short i = 4 ; i <= 9 ; i++) vminSP  .push_back(i*0.10);
+//    vector<double> triggers; for (unsigned short i = 0 ; i <= 1 ; i++) triggers.push_back(i*  30);
+//    
+//    map<TString, double (*)(double)> MC_spectra = {{"flat spectrum", flat_spectrum},
+//                                                   {"#frac{1}{p_{T}^{4}}", falling_spectrum},
+//                                                   {"#frac{1}{p_{T}^{6}}", even_more_falling_spectrum}};
+//
+//    // open PDF files for the different samplings
+//    for (const TString& sampling: vsampling)
+//    {
+//        (new TCanvas (sampling))->Print(sampling + ".pdf[");
+//        divider(sampling + " sampling")->Print(sampling + ".pdf"); // frontpage
+//    }
+//    vector<double> binning;
+//    for (int i = 18 ; i <= 330 ; i++) // TODO
+//        binning.push_back(i);
+//    //// Mikko's binning
+//    //vector<double> std_binning = {/*0,*/18,21,24,28,32,37,43,49,56,64,74,84,97,114,133,153,174,196,220,245,272,300,330/*,362,395,430,468,507,548,592,638,686,737,790,846,905,967,1032,1101,1172,1248,1327,1410,1497,1588,1684,1784,1890,2000,2116,2238,2366,2500,2640,2787,2941,3103,3273,3450,3637,3832,4037,4252,4477,4713,4961,5220,5492,5777,6076,6389,6717,7000*/}; // std in SMP-j
+//    //// regular binning
+//    //vector<double> constant_binwidth_binning(binning.size()); // making binning in similar range but with constant binwidth
+//    //for (size_t i = 0 ; i < binning.size() ; i++) constant_binwidth_binning[i] = i*binning.back()/binning.size();
+//
+//    for (const double& trigger: triggers) for (const double& minSP: vminSP) for (const double& mu: vmu) for (const double& sigma: vsigma) for (const double& tau: vtau) for (auto& MC_spectrum: MC_spectra)
+//    {
+//        cout << "================================================================================"
+//             << "\nParameters:"
+//             << "\n\tMC spectrum = " << MC_spectrum.first
+//             << "\n\tmin stability & purity = " << minSP 
+//             << "\n\tnevents = " << nevents << endl;
+//        vector<TString> parameterisation = {TString::Format("#mu=%f",mu), TString::Format("#sigma=%f", sigma), TString::Format("#tau=%f", tau)},
+//                        requirements     = {TString::Format("minSP=%f",minSP), TString::Format("efficient trigger from %f", trigger)};
+//
+//        TString dirname = MC_spectrum.first + "_" + TString::Format("_trigger%f_minSP%f_mu%f_sigma%f_tau%f", trigger, minSP, mu, sigma, tau);
+//        dirname.ReplaceAll(".", "p");
+//        dirname.ReplaceAll(" ", "_");
+//        dirname.ReplaceAll("-", "_");
+//        dirname.ReplaceAll("#", "");
+//        dirname.ReplaceAll("{", "");
+//        dirname.ReplaceAll("}", "");
+//        dirname.ReplaceAll("^", "");
+//        f->mkdir(dirname)->cd();
+//
+//        cout << "=== Defining resolution function (used only if sigma different from 0)" << endl;
+//        TF1 * f_resolution = new TF1 ("resolution", Resolution, -1, 1, 10);
+//        f_resolution->SetParameters(N, mu, sigma, tau, kL, kR, aL, nL, aR, nR);
+//        cout << "Parameters:"
+//             << "\nN=" << N
+//             << "\nmu=" << mu
+//             << "\nsigma=" << sigma
+//             << "\ntau=" << tau
+//             << "\nkL=" << kL
+//             << "\nkR=" << kR
+//             << "\naL=" << aL
+//             << "\nnL=" << nL
+//             << "\naR=" << aR
+//             << "\nnR=" << nR
+//             <<  endl;
+//
+//        cout << "=== Defining gen and rec histograms" << endl;
+//        TH1D * h_gen = new TH1D ("gen", "Truth"      , binning.size()-1, &binning[0]),
+//             * h_rec = new TH1D ("rec", "Measurement", binning.size()-1, &binning[0]);
+//        const double minpt = 0, maxpt = h_gen->GetXaxis()->GetXmax()*1.1;
+//        make_measurement(h_gen, h_rec, falling_spectrum, minpt, maxpt, f_resolution, nevents, trigger);
+//
+//        for (TString sampling: vsampling)
+//        {
+//            TCanvas * c;
+//            try
+//            {
+//                cout << "=== Defining RM and resolution histograms" << endl;
+//                TH2 * h_RM = new TH2D ("RM", "RM", binning.size()-1, &binning[0], binning.size()-1, &binning[0]),
+//                    * h_resolution = new TH2D("resolution", "resolution", 41, -1, 1, binning.size()-1, &binning[0]);
+//
+//                cout << "=== Filling histograms" << endl;
+//                make_RM(h_RM, h_resolution, MC_spectrum.second, minpt, maxpt, f_resolution, nevents, sampling);
+//
+//                cout << "=== Rebinning" << endl;
+//                vector<double> new_edges = find_binning(h_RM, minSP, minSP);
+//
+//                cout << "=== Making canvas" << endl;
+//                c = make_canvas(h_gen, h_rec, h_RM, h_resolution, new_edges, /*true*/ "#frac{1}{p_{T}^{4}}", /*MC*/ MC_spectrum.first, parameterisation, requirements);
+//            }
+//            catch (TString msg)
+//            {
+//                vector<TString> pave = {msg, MC_spectrum.first};
+//                pave.insert(end(pave), begin(parameterisation), end(parameterisation));
+//                c = divider(pave, kWhite);
+//                cout << "An error was thrown! Continuing." << endl;
+//            }
+//            if (c != nullptr)
+//            {
+//                c->Print(sampling + ".pdf");
+//                delete c;
+//            }
+//        }
+//    }
+//    for (const TString& sampling: vsampling)
+//        (new TCanvas (sampling))->Print(sampling + ".pdf]");
+//
+//    // ending
+//    f->Close();
+//    if (gROOT->IsBatch())
+//        rootapp->Terminate();
+//    else
+//        rootapp->Run();
+//    return EXIT_SUCCESS;
+//}
+//#endif
