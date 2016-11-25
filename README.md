@@ -6,12 +6,14 @@
  - plot ABPS
  - show RM
  - study model dependance
- - vary unfolding method
- - vary the way to build up the RM
+ - compare unfolding methods
+ - tune unfolding methods
+ - different sampling methods for RM
+ - test effect of trigger inefficiency
 
 The main function produces PDF and ROOT files with all results. The code has been developed with Root6 and RooUnfold.
 
-*Note*: the code is not to be used to unfolded real data.
+*Note*: the code is not intended to be used to unfolded real data.
 
 To download RooUnfold:
 > svn co https://svnsrv.desy.de/public/unfolding/RooUnfold/trunk RooUnfold
