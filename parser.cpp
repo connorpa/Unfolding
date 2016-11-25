@@ -174,7 +174,7 @@ int main (int argc, char * argv[])
         cout << "=== Parsing ini file" << endl;
         try
         {
-            pt::ini_parser::read_ini(ini_file, config); // TODO: catch
+            pt::ini_parser::read_ini(ini_file, config);
 
             // TODO: use default values if not found in the ini file
             // TODO: dump (either cout-ing or in the output file)
@@ -199,7 +199,7 @@ int main (int argc, char * argv[])
                 for (unsigned short iparam = 0 ; iparam < parameters.size() ; iparam++)
                     model->SetParameter(iparam, parameters[iparam]);
                 v_sampling = get_elements<string>(model_section.get<string>("sampling"), ',');
-                model_nevents = model_section.get<long>("nevents"); // TODO: modify perfect sampling to use the number of events as the number of scanned points
+                model_nevents = model_section.get<long>("nevents");
             }
 
             {
@@ -344,7 +344,7 @@ int main (int argc, char * argv[])
                 f_efficiency->Write();
                 
                 // loop over the resolution parameters
-                for (const double res_N: v_res_N) for (const double res_mu: v_res_mu) for (const TF1 * res_sigma: v_res_sigma) for (const double res_tau: v_res_tau) for (const double res_kL: v_res_kL) for (const double res_kR: v_res_kR) for (const double res_aL: v_res_aL) for (const double res_nL: v_res_nL) for (const double res_aR: v_res_aR) for (const double res_nR: v_res_nR)
+                for (const double res_N: v_res_N) for (const double res_mu: v_res_mu) for (TF1 * res_sigma: v_res_sigma) for (const double res_tau: v_res_tau) for (const double res_kL: v_res_kL) for (const double res_kR: v_res_kR) for (const double res_aL: v_res_aL) for (const double res_nL: v_res_nL) for (const double res_aR: v_res_aR) for (const double res_nR: v_res_nR)
                 {
                     cout << "-- resolution parameters:" << res_N << '\t' << res_mu << '\t' << res_sigma->Eval((xmax-xmin)/2) << '\t' << res_tau << '\t'
                                                         << res_kR << '\t' << res_kL << '\t' << res_aL << '\t' << res_nL << '\t' << res_aR << '\t' << res_nR << endl;
@@ -365,7 +365,7 @@ int main (int argc, char * argv[])
                     // make and save measurement with default binning
                     TH1D * h_gen = new TH1D ("gen", "Truth"      , binning.size()-1, &binning[0]),
                          * h_rec = new TH1D ("rec", "Measurement", binning.size()-1, &binning[0]);
-                    make_measurement(h_gen, h_rec, truth, xmin, xmax, f_resolution, truth_nevents, xmin); // TODO: implement the use of the efficiency function and of the resolution parameters
+                    make_measurement(h_gen, h_rec, truth, f_efficiency, xmin, xmax, f_resolution, res_sigma, truth_nevents);
                     h_gen->Write();
                     h_rec->Write();
 
@@ -379,7 +379,7 @@ int main (int argc, char * argv[])
                         // generate and save RM and differential resolution
                         TH2 * h_RM = new TH2D ("RM", "RM", binning.size()-1, &binning[0], binning.size()-1, &binning[0]),
                             * h_resolution = new TH2D("resolution", "resolution", 41, -1, 1, binning.size()-1, &binning[0]);
-                        make_RM(h_RM, h_resolution, model, xmin, xmax, f_resolution, model_nevents, sampling.c_str()); // TODO: use sigma
+                        make_RM(h_RM, h_resolution, model, xmin, xmax, f_resolution, res_sigma, model_nevents, sampling.c_str()); // TODO: use sigma
                         h_RM->Write();
                         h_resolution->Write();
 
@@ -390,17 +390,16 @@ int main (int argc, char * argv[])
                             string dir_binning_name = "binning_" + to_string(minS) + '_' + to_string(minP);
                             TDirectory * dir_binning = dir_sampling->mkdir(dir_binning_name.c_str());
                             dir_binning->cd();
-                            //h_gen->SetDirectory(dir_binning); // TODO?
-                            //h_rec->SetDirectory(dir_binning); 
-                            //h_RM->SetDirectory(dir_binning);
-                            //h_resolution->SetDirectory(dir_binning);
-
-//        vector<TString> parameterisation = {TString::Format("#mu=%f",mu), TString::Format("#sigma=%f", sigma), TString::Format("#tau=%f", tau)},
-//                        requirements     = {TString::Format("minSP=%f",minSP), TString::Format("efficient trigger from %f", trigger)};
+                            vector<TString> pave_ABPS = {TString::Format("minS=%f", minS),
+                                                         TString::Format("minP=%f", minP),
+                                                         TString::Format("a=%f", eff_a),
+                                                         TString::Format("#mu=%f", eff_mu),
+                                                         TString::Format("#sigma=%f", eff_sigma)},
+                                            pave_resolution = {TString::Format("#sigma=%f+#frac{%f}{p_{T}^{%f}+%f*p_{T}}+%f*p_{T}", res_sigma->GetParameter(1), res_sigma->GetParameter(2), res_sigma->GetParameter(3), res_sigma->GetParameter(4), res_sigma->GetParameter(5))};
                             try
                             {
                                 vector<double> new_edges = find_binning(h_RM, minS, minP);
-                                c = make_canvas(h_gen, h_rec, h_RM, h_resolution, new_edges, truth->GetTitle(), model->GetTitle(), v_parameters); // writing is done inside of the function
+                                c = make_canvas(h_gen, h_rec, h_RM, h_resolution, new_edges, truth->GetTitle(), model->GetTitle(), v_parameters, pave_resolution, pave_ABPS); // writing is done inside of the function
                             }
                             catch (TString s)
                             {

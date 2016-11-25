@@ -91,6 +91,7 @@ void make_RM (TH2 * h_RM,
               double minpt,
               double maxpt,
               TF1 * f_resolution,
+              TF1 * f_sigma,
               unsigned long nevents,
               TString sampling)
 {
@@ -104,7 +105,7 @@ void make_RM (TH2 * h_RM,
 
     TRandom3 r;
     cout << ">>> RM and resolution" << endl;
-    const double step = 1; // TODO
+    const double step = 1;
     if (kPerfectSampling)
     {
         for (int ybin = 1 ; ybin <= h_RM->GetNbinsY() ; ybin++)
@@ -118,6 +119,7 @@ void make_RM (TH2 * h_RM,
                     double xbinwidth = h_RM->GetXaxis()->GetBinWidth(xbin);
                     for (double pt_rec = h_RM->GetXaxis()->GetBinLowEdge(xbin)+1 ; pt_rec <= h_RM->GetXaxis()->GetBinUpEdge(xbin) ; pt_rec += step)
                     {
+                        f_resolution->SetParameter(2, f_sigma->Eval(pt_gen));
                         double x = (pt_gen-pt_rec)/pt_gen,
                                resolution = f_resolution->Eval(x);
                         h_RM->SetBinContent(xbin, ybin, h_RM->GetBinContent(xbin, ybin) + current_xsec*resolution/(xbinwidth*ybinwidth));
@@ -145,23 +147,27 @@ void make_RM (TH2 * h_RM,
                 pt_rec = pt_gen*(1-x);
                 x = f_resolution->GetParameter(1);
             }
-            else if (kUniformSampling)
-            {
-                pt_rec = minpt + r.Rndm()*(maxpt-minpt);
-                x = (pt_gen-pt_rec)/pt_gen;
-                if (x < minresolution)
-                    continue; // to mimick core sampling
-                else if (x > maxresolution) // this should normally never happen
-                    throw TString::Format("pt_gen=%f && pt_rec=%f => x=%f", pt_gen, pt_rec, x);
-                weight *= f_resolution->Eval(x);
-            }
-            else  if (kCoreSampling)
-            {
-                x = f_resolution->GetRandom(minresolution, maxresolution);
-                pt_rec = pt_gen*(1-x);
-            }
             else
-                throw TString("Undefined sampling");
+            {
+                f_resolution->SetParameter(2, f_sigma->Eval(pt_gen));
+                if (kUniformSampling)
+                {
+                    pt_rec = minpt + r.Rndm()*(maxpt-minpt);
+                    x = (pt_gen-pt_rec)/pt_gen;
+                    if (x < minresolution)
+                        continue; // to mimick core sampling
+                    else if (x > maxresolution) // this should normally never happen
+                        throw TString::Format("pt_gen=%f && pt_rec=%f => x=%f", pt_gen, pt_rec, x);
+                    weight *= f_resolution->Eval(x);
+                }
+                else  if (kCoreSampling)
+                {
+                    x = f_resolution->GetRandom(minresolution, maxresolution);
+                    pt_rec = pt_gen*(1-x);
+                }
+                else
+                    throw TString("Undefined sampling");
+            }
 
             h_RM        ->Fill(pt_rec, pt_gen, weight);
             h_resolution->Fill(x     , pt_gen, weight);
@@ -187,12 +193,12 @@ void make_RM (TH2 * h_RM,
 void make_measurement (TH1 * h_gen,
                        TH1 * h_rec,
                        TF1 * xsec,
-                       //double (* xsec)(double),
+                       TF1 * f_efficiency,
                        double minpt,
                        double maxpt,
                        TF1 * f_resolution,
-                       unsigned long nevents,
-                       double trigger)
+                       TF1 * f_sigma,
+                       unsigned long nevents)
 {
     cout << ">>> truth and measurement" << endl;
     TRandom3 r;
@@ -202,28 +208,22 @@ void make_measurement (TH1 * h_gen,
     {
         // truth
         double pt_gen = minpt + r.Rndm()*(maxpt-minpt),
-               weight = xsec->Eval(pt_gen);
+               weight = xsec->Eval(pt_gen) * f_efficiency->Eval(pt_gen);
         h_gen->Fill(pt_gen, weight);
         // measurement
         double x, pt_rec;
         if (f_resolution->GetParameter(1) == 0)
             x = f_resolution->GetParameter(1);
         else
+        {
+            f_resolution->SetParameter(2, f_sigma->Eval(pt_gen));
             x = f_resolution->GetRandom(minresolution, maxresolution);
+        }
         pt_rec = pt_gen*(1-x);
         h_rec->Fill(pt_rec, weight);
     }
     h_gen->Scale(1./h_gen->Integral());
     h_rec->Scale(1./h_rec->Integral());
-
-    short trigger_bin = h_rec->FindBin(trigger);
-    double trigger_min_pt_content = h_rec->GetBinContent(trigger_bin),
-           trigger_min_pt_error   = h_rec->GetBinError  (trigger_bin);
-    for (short ibin = 0 ; ibin < trigger_bin ; ibin++)
-    {
-        h_rec->SetBinContent(ibin, trigger_min_pt_content);
-        h_rec->SetBinError  (ibin, trigger_min_pt_error  );
-    }
 
     // style
     h_rec->SetLineColor(kBlack);
@@ -380,9 +380,9 @@ vector<TH1 *> make_unfolding (TH2 * rebinned_RM,
             default:
                 throw string("Unknown unfolding type.");
         }
-        unfolded_spectra.push_back(RU_unfolding->Hreco()); // TODO: name? title?
+        unfolded_spectra.push_back(RU_unfolding->Hreco());
         unfolded_spectra.back()->SetTitle(title);
-        delete RU_unfolding; // TODO?
+        delete RU_unfolding;
     }
 
     vector<Color_t> colours = {kBlue, kMagenta+2, kOrange+7, kGreen+3, kCyan+2, kAzure+3};
@@ -616,9 +616,9 @@ TCanvas * make_canvas (TH1 * h_gen,
                        vector<double> new_edges,
                        TString true_xsec,
                        TString MC_xsec,
-                       vector<UnfoldingParameters *> v_parameters)//,
-                       //vector<TString> parameters,
-                       //vector<TString> requirements)
+                       vector<UnfoldingParameters *> v_parameters,
+                       vector<TString> pave_res_parameters,
+                       vector<TString> pave_ABPS_eff)
 {
     int nbins = new_edges.size()-1;
     TH1 * rebinned_gen = h_gen->Rebin(nbins, TString("rebinned_") + h_gen->GetName(), &new_edges[0]),
@@ -659,13 +659,13 @@ TCanvas * make_canvas (TH1 * h_gen,
     c->GetPad(3)->SetTopMargin(0.05);
     h_resolution->DrawCopy("colz");
     h_resolution->Write();
-    //// TPaveText (Double_t x1, Double_t y1, Double_t x2, Double_t y2, Option_t *option="br") // TODO
-    //TPaveText * resolution_text  = new TPaveText(0.7, 0.6 , 0.89, 0.89, "NBNDC");
-    //resolution_text->SetFillColorAlpha(0,0);
-    //resolution_text->SetTextFont(42);
-    //for (const TString& parameter: parameters)
-    //    resolution_text->AddText(parameter);
-    //resolution_text->Draw();
+    // TPaveText (Double_t x1, Double_t y1, Double_t x2, Double_t y2, Option_t *option="br")
+    TPaveText * resolution_text  = new TPaveText(0.7, 0.6 , 0.89, 0.89, "NBNDC");
+    resolution_text->SetFillColorAlpha(0,0);
+    resolution_text->SetTextFont(42);
+    for (const TString& parameter: pave_res_parameters)
+        resolution_text->AddText(parameter);
+    resolution_text->Draw();
 
     c->cd(2);
     c->GetPad(2)->Divide(1,2, 0);
@@ -684,14 +684,14 @@ TCanvas * make_canvas (TH1 * h_gen,
         ABPS[i]->Write();
     }
     c->GetPad(2)->GetPad(1)->BuildLegend(0.4,0.2,0.6,0.5);
-    //// TPaveText (Double_t x1, Double_t y1, Double_t x2, Double_t y2, Option_t *option="br") // TODO
-    //TPaveText * ABPS_text  = new TPaveText(0.6, 0.25, 0.89, 0.45, "NBNDC");
-    //ABPS_text->SetFillColorAlpha(0,0);
-    //ABPS_text->SetTextFont(42);
-    //for (const TString& requirement: requirements)
-    //    ABPS_text->AddText(requirement);
-    //ABPS_text->Draw();
-    //c->GetPad(2)->GetPad(1)->RedrawAxis();
+    // TPaveText (Double_t x1, Double_t y1, Double_t x2, Double_t y2, Option_t *option="br") 
+    TPaveText * ABPS_text  = new TPaveText(0.6, 0.25, 0.89, 0.65, "NBNDC");
+    ABPS_text->SetFillColorAlpha(0,0);
+    ABPS_text->SetTextFont(42);
+    for (const TString& line: pave_ABPS_eff)
+        ABPS_text->AddText(line);
+    ABPS_text->Draw();
+    c->GetPad(2)->GetPad(1)->RedrawAxis();
 
     pair<TH1 *, TH1 *> miss_and_fake = make_miss_fake(rebinned_RM, rebinned_gen, rebinned_rec);
 
@@ -783,131 +783,3 @@ TCanvas * make_canvas (TH1 * h_gen,
     return c;
 }
 
-//#ifdef NOPARSER
-//int main (int argc, char* argv[])
-//{
-//    gROOT->SetBatch();
-//    gStyle->SetOptTitle(0);
-//    TH1D::SetDefaultSumw2(true); // correct error computation
-//    TColor::CreateColorWheel();
-//
-//    // declaring TApplication (needed to use the full power of Root as a library)
-//    TApplication * rootapp = new TApplication ("unfolding", &argc, argv);
-//    TFile * f = new TFile ("unfolding.root", "RECREATE");
-//
-//    // parameters TODO (don't forget to modify the path in the output root file
-//    const unsigned long nevents = 4e7;
-//    vector<TString> vsampling = {"perfect", "uniform", "core"};
-//    double N = 1, kL = -1, kR = 1, aL = -1, nL = 1, aR = 1, nR = 1;
-//    // my guess: the resolution is fundamentally gaussian, every deviation comes from a bad matching --> to be studied
-//    vector<double> vmu     ; for (unsigned short i = 0 ; i <= 1 ; i++) vmu     .push_back(i*0.01);
-//    vector<double> vsigma  ; for (unsigned short i = 1 ; i <= 3 ; i++) vsigma  .push_back(i*0.02);
-//    vector<double> vtau    ; for (unsigned short i = 0 ; i <= 1 ; i++) vtau    .push_back(i*0.01);
-//    vector<double> vminSP  ; for (unsigned short i = 4 ; i <= 9 ; i++) vminSP  .push_back(i*0.10);
-//    vector<double> triggers; for (unsigned short i = 0 ; i <= 1 ; i++) triggers.push_back(i*  30);
-//    
-//    map<TString, double (*)(double)> MC_spectra = {{"flat spectrum", flat_spectrum},
-//                                                   {"#frac{1}{p_{T}^{4}}", falling_spectrum},
-//                                                   {"#frac{1}{p_{T}^{6}}", even_more_falling_spectrum}};
-//
-//    // open PDF files for the different samplings
-//    for (const TString& sampling: vsampling)
-//    {
-//        (new TCanvas (sampling))->Print(sampling + ".pdf[");
-//        divider(sampling + " sampling")->Print(sampling + ".pdf"); // frontpage
-//    }
-//    vector<double> binning;
-//    for (int i = 18 ; i <= 330 ; i++) // TODO
-//        binning.push_back(i);
-//    //// Mikko's binning
-//    //vector<double> std_binning = {/*0,*/18,21,24,28,32,37,43,49,56,64,74,84,97,114,133,153,174,196,220,245,272,300,330/*,362,395,430,468,507,548,592,638,686,737,790,846,905,967,1032,1101,1172,1248,1327,1410,1497,1588,1684,1784,1890,2000,2116,2238,2366,2500,2640,2787,2941,3103,3273,3450,3637,3832,4037,4252,4477,4713,4961,5220,5492,5777,6076,6389,6717,7000*/}; // std in SMP-j
-//    //// regular binning
-//    //vector<double> constant_binwidth_binning(binning.size()); // making binning in similar range but with constant binwidth
-//    //for (size_t i = 0 ; i < binning.size() ; i++) constant_binwidth_binning[i] = i*binning.back()/binning.size();
-//
-//    for (const double& trigger: triggers) for (const double& minSP: vminSP) for (const double& mu: vmu) for (const double& sigma: vsigma) for (const double& tau: vtau) for (auto& MC_spectrum: MC_spectra)
-//    {
-//        cout << "================================================================================"
-//             << "\nParameters:"
-//             << "\n\tMC spectrum = " << MC_spectrum.first
-//             << "\n\tmin stability & purity = " << minSP 
-//             << "\n\tnevents = " << nevents << endl;
-//        vector<TString> parameterisation = {TString::Format("#mu=%f",mu), TString::Format("#sigma=%f", sigma), TString::Format("#tau=%f", tau)},
-//                        requirements     = {TString::Format("minSP=%f",minSP), TString::Format("efficient trigger from %f", trigger)};
-//
-//        TString dirname = MC_spectrum.first + "_" + TString::Format("_trigger%f_minSP%f_mu%f_sigma%f_tau%f", trigger, minSP, mu, sigma, tau);
-//        dirname.ReplaceAll(".", "p");
-//        dirname.ReplaceAll(" ", "_");
-//        dirname.ReplaceAll("-", "_");
-//        dirname.ReplaceAll("#", "");
-//        dirname.ReplaceAll("{", "");
-//        dirname.ReplaceAll("}", "");
-//        dirname.ReplaceAll("^", "");
-//        f->mkdir(dirname)->cd();
-//
-//        cout << "=== Defining resolution function (used only if sigma different from 0)" << endl;
-//        TF1 * f_resolution = new TF1 ("resolution", Resolution, -1, 1, 10);
-//        f_resolution->SetParameters(N, mu, sigma, tau, kL, kR, aL, nL, aR, nR);
-//        cout << "Parameters:"
-//             << "\nN=" << N
-//             << "\nmu=" << mu
-//             << "\nsigma=" << sigma
-//             << "\ntau=" << tau
-//             << "\nkL=" << kL
-//             << "\nkR=" << kR
-//             << "\naL=" << aL
-//             << "\nnL=" << nL
-//             << "\naR=" << aR
-//             << "\nnR=" << nR
-//             <<  endl;
-//
-//        cout << "=== Defining gen and rec histograms" << endl;
-//        TH1D * h_gen = new TH1D ("gen", "Truth"      , binning.size()-1, &binning[0]),
-//             * h_rec = new TH1D ("rec", "Measurement", binning.size()-1, &binning[0]);
-//        const double minpt = 0, maxpt = h_gen->GetXaxis()->GetXmax()*1.1;
-//        make_measurement(h_gen, h_rec, falling_spectrum, minpt, maxpt, f_resolution, nevents, trigger);
-//
-//        for (TString sampling: vsampling)
-//        {
-//            TCanvas * c;
-//            try
-//            {
-//                cout << "=== Defining RM and resolution histograms" << endl;
-//                TH2 * h_RM = new TH2D ("RM", "RM", binning.size()-1, &binning[0], binning.size()-1, &binning[0]),
-//                    * h_resolution = new TH2D("resolution", "resolution", 41, -1, 1, binning.size()-1, &binning[0]);
-//
-//                cout << "=== Filling histograms" << endl;
-//                make_RM(h_RM, h_resolution, MC_spectrum.second, minpt, maxpt, f_resolution, nevents, sampling);
-//
-//                cout << "=== Rebinning" << endl;
-//                vector<double> new_edges = find_binning(h_RM, minSP, minSP);
-//
-//                cout << "=== Making canvas" << endl;
-//                c = make_canvas(h_gen, h_rec, h_RM, h_resolution, new_edges, /*true*/ "#frac{1}{p_{T}^{4}}", /*MC*/ MC_spectrum.first, parameterisation, requirements);
-//            }
-//            catch (TString msg)
-//            {
-//                vector<TString> pave = {msg, MC_spectrum.first};
-//                pave.insert(end(pave), begin(parameterisation), end(parameterisation));
-//                c = divider(pave, kWhite);
-//                cout << "An error was thrown! Continuing." << endl;
-//            }
-//            if (c != nullptr)
-//            {
-//                c->Print(sampling + ".pdf");
-//                delete c;
-//            }
-//        }
-//    }
-//    for (const TString& sampling: vsampling)
-//        (new TCanvas (sampling))->Print(sampling + ".pdf]");
-//
-//    // ending
-//    f->Close();
-//    if (gROOT->IsBatch())
-//        rootapp->Terminate();
-//    else
-//        rootapp->Run();
-//    return EXIT_SUCCESS;
-//}
-//#endif
