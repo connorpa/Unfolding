@@ -335,6 +335,7 @@ int main (int argc, char * argv[])
 
                 // define new directory
                 string dir_efficiency_name = "efficiency_" + to_string(eff_a) + '_' + to_string(eff_mu) + '_' + to_string(eff_sigma);
+                replace(dir_efficiency_name.begin(), dir_efficiency_name.end(), '.', '_');
                 TDirectory * dir_efficiency = f_output->mkdir(dir_efficiency_name.c_str());
                 dir_efficiency->cd();
 
@@ -343,6 +344,11 @@ int main (int argc, char * argv[])
                 f_efficiency->SetParameters(eff_a, eff_mu, eff_sigma);
                 f_efficiency->Write();
                 
+                // determine turn-on point
+                unsigned iturnon = binning.front();
+                while (iturnon < binning.size() && f_efficiency->Eval(binning[iturnon]) < 0.99) iturnon++;
+                double turnon = binning[iturnon];
+
                 // loop over the resolution parameters
                 for (const double res_N: v_res_N) for (const double res_mu: v_res_mu) for (TF1 * res_sigma: v_res_sigma) for (const double res_tau: v_res_tau) for (const double res_kL: v_res_kL) for (const double res_kR: v_res_kR) for (const double res_aL: v_res_aL) for (const double res_nL: v_res_nL) for (const double res_aR: v_res_aR) for (const double res_nR: v_res_nR)
                 {
@@ -394,12 +400,13 @@ int main (int argc, char * argv[])
                                                          TString::Format("minP=%f", minP),
                                                          TString::Format("a=%f", eff_a),
                                                          TString::Format("#mu=%f", eff_mu),
-                                                         TString::Format("#sigma=%f", eff_sigma)},
+                                                         TString::Format("#sigma=%f", eff_sigma),
+                                                         TString::Format("turn-on=%f", turnon)},
                                             pave_resolution = {TString::Format("#sigma=%f+#frac{%f}{p_{T}^{%f}+%f*p_{T}}+%f*p_{T}", res_sigma->GetParameter(1), res_sigma->GetParameter(2), res_sigma->GetParameter(3), res_sigma->GetParameter(4), res_sigma->GetParameter(5))};
                             try
                             {
                                 vector<double> new_edges = find_binning(h_RM, minS, minP);
-                                c = make_canvas(h_gen, h_rec, h_RM, h_resolution, new_edges, truth->GetTitle(), model->GetTitle(), v_parameters, pave_resolution, pave_ABPS); // writing is done inside of the function
+                                c = make_canvas(h_gen, h_rec, h_RM, h_resolution, new_edges, truth->GetTitle(), model->GetTitle(), v_parameters, pave_resolution, pave_ABPS, turnon); // writing is done inside of the function
                             }
                             catch (TString s)
                             {

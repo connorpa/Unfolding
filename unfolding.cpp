@@ -609,6 +609,14 @@ void draw_response_matrix (TVirtualPad * p,
     miss_label->Draw();                        fake_label->Draw();
 }
 
+void draw_turnon_line (double turnon, double ymin, double ymax)
+{
+    double x[2] = {turnon, turnon},
+           y[2] = {ymin,ymax};
+    TGraph * line = new TGraph(2,x,y);
+    line->Draw("sameL");
+}
+
 TCanvas * make_canvas (TH1 * h_gen, 
                        TH1 * h_rec,
                        TH2 * h_RM,
@@ -618,7 +626,8 @@ TCanvas * make_canvas (TH1 * h_gen,
                        TString MC_xsec,
                        vector<UnfoldingParameters *> v_parameters,
                        vector<TString> pave_res_parameters,
-                       vector<TString> pave_ABPS_eff)
+                       vector<TString> pave_ABPS_eff,
+                       double turnon)
 {
     int nbins = new_edges.size()-1;
     TH1 * rebinned_gen = h_gen->Rebin(nbins, TString("rebinned_") + h_gen->GetName(), &new_edges[0]),
@@ -672,7 +681,7 @@ TCanvas * make_canvas (TH1 * h_gen,
     cout << "=== Plotting ABPS" << endl;
     c->GetPad(2)->cd(1);
     c->GetPad(2)->GetPad(1)->SetLogx();
-    c->GetPad(2)->GetPad(1)->SetGridx();
+    //c->GetPad(2)->GetPad(1)->SetGridx();
     c->GetPad(2)->GetPad(1)->SetTicks();
     vector<TH1 *> ABPS = make_ABPS(rebinned_RM);
     ABPS.front()->SetStats(0);
@@ -691,6 +700,7 @@ TCanvas * make_canvas (TH1 * h_gen,
     for (const TString& line: pave_ABPS_eff)
         ABPS_text->AddText(line);
     ABPS_text->Draw();
+    draw_turnon_line(turnon, ABPS.front()->GetYaxis()->GetXmin(), ABPS.front()->GetYaxis()->GetXmax());
     c->GetPad(2)->GetPad(1)->RedrawAxis();
 
     pair<TH1 *, TH1 *> miss_and_fake = make_miss_fake(rebinned_RM, rebinned_gen, rebinned_rec);
@@ -699,7 +709,7 @@ TCanvas * make_canvas (TH1 * h_gen,
     c->GetPad(2)->cd(2);
     c->GetPad(2)->GetPad(2)->SetLogx();
     c->GetPad(2)->GetPad(2)->SetLogy();
-    c->GetPad(2)->GetPad(2)->SetGridx();
+    //c->GetPad(2)->GetPad(2)->SetGridx();
     c->GetPad(2)->GetPad(2)->SetTicks();
 
     // the following vector will contain all the spectra at hadron level: the generated spectrum and the unfolded spectra
@@ -727,6 +737,7 @@ TCanvas * make_canvas (TH1 * h_gen,
         unfolded_spectrum->Write();
     }
     c->GetPad(2)->GetPad(2)->BuildLegend(0.3, 0.3, 0.5, 0.6);
+    draw_turnon_line(turnon, rebinned_rec->GetYaxis()->GetXmin(), rebinned_rec->GetYaxis()->GetXmax());
     c->GetPad(2)->GetPad(2)->RedrawAxis();
     // TPaveText (Double_t x1, Double_t y1, Double_t x2, Double_t y2, Option_t *option="br")
     TPaveText * spectrum_text = new TPaveText(0.7,0.2,0.89,0.3, "NBNDC");
@@ -744,7 +755,7 @@ TCanvas * make_canvas (TH1 * h_gen,
     {
         c->GetPad(4)->cd(i+1);
         c->GetPad(4)->GetPad(i+1)->SetLogx();
-        c->GetPad(4)->GetPad(i+1)->SetGridx();
+        //c->GetPad(4)->GetPad(i+1)->SetGridx();
         c->GetPad(4)->GetPad(i+1)->SetTicks();
         TH1D * ratio = static_cast<TH1D*>(numerators[i]->Clone(TString::Format("%s/rec", numerators[i]->GetName())));
         ratio->Divide(rebinned_rec);
@@ -758,6 +769,7 @@ TCanvas * make_canvas (TH1 * h_gen,
         ratio->GetYaxis()->SetRangeUser(0,2);
         ratio->DrawCopy();
         ratio->Write();
+        draw_turnon_line(turnon, ratio->GetYaxis()->GetXmin(), ratio->GetYaxis()->GetXmax());
         delete ratio;
     }
 

@@ -21,9 +21,9 @@ TF1 * spectrum ()
     c->SetGridx();
     c->SetGridy();
     c->SetLogy();
-    TF1 * spectrum = new TF1 ("spectrum", Spectrum, 1, 100, NTERMS);
-    spectrum->SetParameters(0,0,0,0,1,0,0,0,0,0);
-    spectrum->Draw();
-    return spectrum;
+    TF1 * f = new TF1 ("spectrum", Spectrum, 1, 100, NTERMS);
+    f->SetParameters(0,0,0,0,1,0,0,0,0,0);
+    f->Draw();
+    return f;
 }
 #endif
