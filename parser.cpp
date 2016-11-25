@@ -322,7 +322,7 @@ int main (int argc, char * argv[])
         TFile * f_output;
         try
         {
-            c = divider(filename); // TODO: customise first page
+            c = divider(get_elements<string>(title, ';'));
             c->Draw();
             c->Print((filename + '(').c_str());
             f_output = new TFile (rootfilename.c_str(), "RECREATE");
@@ -379,7 +379,7 @@ int main (int argc, char * argv[])
                         // generate and save RM and differential resolution
                         TH2 * h_RM = new TH2D ("RM", "RM", binning.size()-1, &binning[0], binning.size()-1, &binning[0]),
                             * h_resolution = new TH2D("resolution", "resolution", 41, -1, 1, binning.size()-1, &binning[0]);
-                        make_RM(h_RM, h_resolution, model, xmin, xmax, f_resolution, res_sigma, model_nevents, sampling.c_str()); // TODO: use sigma
+                        make_RM(h_RM, h_resolution, model, xmin, xmax, f_resolution, res_sigma, model_nevents, sampling.c_str());
                         h_RM->Write();
                         h_resolution->Write();
 
