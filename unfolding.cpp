@@ -385,7 +385,7 @@ vector<TH1 *> make_unfolding (TH2 * rebinned_RM,
         delete RU_unfolding;
     }
 
-    vector<Color_t> colours = {kBlue, kMagenta+2, kOrange+7, kGreen+3, kCyan+2, kAzure+3};
+    vector<Color_t> colours = {kBlue, kMagenta+2, kOrange+7, kGreen+3, kCyan+2, kAzure+3, kOrange-5, kCyan-1, kYellow+4};
     for (unsigned short i = 0 ; i < unfolded_spectra.size() ; i++)
     {
         unfolded_spectra[i]->SetLineColor  (colours[i%colours.size()]);
