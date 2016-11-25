@@ -257,17 +257,17 @@ vector<double> find_binning (TH2 * h_RM, float minimal_stability, float minimal_
     // --> if purity and stability are good enough, then keep the up edge
     for (int ibin = firstbin ; ibin <= h_RM->GetNbinsX() ; ibin++)
     {
-        cout << "ibin=" << ibin << "\tfirstbin=" << firstbin;
+        //cout << "ibin=" << ibin << "\tfirstbin=" << firstbin;
         double rec_content = h_RM->Integral(firstbin, ibin, 1, -1),
                gen_content = h_RM->Integral(1, -1, firstbin, ibin),
                matched_content = h_RM->Integral(firstbin, ibin, firstbin, ibin);
-        cout << "\tmatched_content=" << matched_content << "\tgen_content=" << gen_content << "\trec_content=" << rec_content;
+        //cout << "\tmatched_content=" << matched_content << "\tgen_content=" << gen_content << "\trec_content=" << rec_content;
         const double stability = matched_content/gen_content,
                      purity    = matched_content/rec_content;
-        cout << "\tstability=" << stability << "\tpurity=" << purity << endl;
+        //cout << "\tstability=" << stability << "\tpurity=" << purity << endl;
         if (stability > minimal_stability && purity > minimal_purity)
         {
-            cout << "------------------------" << endl;
+            //cout << "------------------------" << endl;
             new_edges.push_back(px->GetXaxis()->GetBinUpEdge(ibin));
             firstbin = ibin+1;
         }
