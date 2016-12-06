@@ -208,7 +208,7 @@ void make_measurement (TH1 * h_gen,
     {
         // truth
         double pt_gen = minpt + r.Rndm()*(maxpt-minpt),
-               weight = xsec->Eval(pt_gen) * f_efficiency->Eval(pt_gen);
+               weight = xsec->Eval(pt_gen);
         h_gen->Fill(pt_gen, weight);
         // measurement
         double x, pt_rec;
@@ -220,10 +220,13 @@ void make_measurement (TH1 * h_gen,
             x = f_resolution->GetRandom(minresolution, maxresolution);
         }
         pt_rec = pt_gen*(1-x);
+        weight *= f_efficiency->Eval(pt_rec);
+        //cout << pt_rec << '\t' << f_efficiency->Eval(pt_rec) << endl;
         h_rec->Fill(pt_rec, weight);
     }
-    h_gen->Scale(1./h_gen->Integral());
-    h_rec->Scale(1./h_rec->Integral());
+    double normalisation = h_gen->Integral();
+    h_rec->Scale(1./normalisation);
+    h_gen->Scale(1./normalisation);
 
     // style
     h_rec->SetLineColor(kBlack);
@@ -234,7 +237,6 @@ void make_measurement (TH1 * h_gen,
     h_rec->SetMarkerSize(0.5);
     h_rec->GetXaxis()->SetNoExponent();
     h_rec->GetXaxis()->SetMoreLogLabels();
-    h_rec->GetYaxis()->SetRangeUser(1e-15, 1);
     h_gen->SetLineColor(kRed);
     h_gen->SetMarkerColor(kRed);
     h_gen->SetStats(0);
@@ -275,7 +277,7 @@ vector<double> find_binning (TH2 * h_RM, float minimal_stability, float minimal_
     const int nbins = new_edges.size()-1;
     if (nbins < 2) throw TString("Invalid bin width");
     //new_edges.back() = px->GetXaxis()->GetXmax(); // last edge has to match /b/ old and new binnings
-    new_edges.push_back(px->GetXaxis()->GetXmax()); // in case of additional rebinning for TUnfold...
+    if (new_edges.back() != px->GetXaxis()->GetXmax()) new_edges.push_back(px->GetXaxis()->GetXmax()); // in case of additional rebinning for TUnfold...
     cout << "New binning (nbins=" << new_edges.size()-1 << "):";
     for (auto& new_edge: new_edges)
         cout << '\t' << new_edge;
@@ -614,6 +616,7 @@ void draw_turnon_line (double turnon, double ymin, double ymax)
     double x[2] = {turnon, turnon},
            y[2] = {ymin,ymax};
     TGraph * line = new TGraph(2,x,y);
+    line->SetTitle("turn-on");
     line->Draw("sameL");
 }
 
@@ -626,7 +629,8 @@ TCanvas * make_canvas (TH1 * h_gen,
                        TString MC_xsec,
                        vector<UnfoldingParameters *> v_parameters,
                        vector<TString> pave_res_parameters,
-                       vector<TString> pave_ABPS_eff,
+                       vector<TString> pave_ABPS,
+                       vector<TString> pave_trigger,
                        double turnon)
 {
     int nbins = new_edges.size()-1;
@@ -669,7 +673,7 @@ TCanvas * make_canvas (TH1 * h_gen,
     h_resolution->DrawCopy("colz");
     h_resolution->Write();
     // TPaveText (Double_t x1, Double_t y1, Double_t x2, Double_t y2, Option_t *option="br")
-    TPaveText * resolution_text  = new TPaveText(0.7, 0.6 , 0.89, 0.89, "NBNDC");
+    TPaveText * resolution_text = new TPaveText(0.5, 0.6 , 0.89, 0.89, "NBNDC");
     resolution_text->SetFillColorAlpha(0,0);
     resolution_text->SetTextFont(42);
     for (const TString& parameter: pave_res_parameters)
@@ -692,15 +696,14 @@ TCanvas * make_canvas (TH1 * h_gen,
         ABPS[i]->Draw("same hist");
         ABPS[i]->Write();
     }
-    c->GetPad(2)->GetPad(1)->BuildLegend(0.4,0.2,0.6,0.5);
+    c->GetPad(2)->GetPad(1)->BuildLegend(0.7,0.7,0.9,0.9);
     // TPaveText (Double_t x1, Double_t y1, Double_t x2, Double_t y2, Option_t *option="br") 
-    TPaveText * ABPS_text  = new TPaveText(0.6, 0.25, 0.89, 0.65, "NBNDC");
+    TPaveText * ABPS_text  = new TPaveText(0.2, 0.2, 0.4, 0.4, "NBNDC");
     ABPS_text->SetFillColorAlpha(0,0);
     ABPS_text->SetTextFont(42);
-    for (const TString& line: pave_ABPS_eff)
+    for (const TString& line: pave_ABPS)
         ABPS_text->AddText(line);
     ABPS_text->Draw();
-    draw_turnon_line(turnon, ABPS.front()->GetYaxis()->GetXmin(), ABPS.front()->GetYaxis()->GetXmax());
     c->GetPad(2)->GetPad(1)->RedrawAxis();
 
     pair<TH1 *, TH1 *> miss_and_fake = make_miss_fake(rebinned_RM, rebinned_gen, rebinned_rec);
@@ -718,6 +721,7 @@ TCanvas * make_canvas (TH1 * h_gen,
     rebinned_rec->GetYaxis()->SetMoreLogLabels();
     rebinned_rec->Scale(1,"width");
     rebinned_gen->Scale(1,"width");
+    rebinned_rec->GetYaxis()->SetRangeUser(rebinned_rec->GetMinimum()/2, 1);
     rebinned_rec->DrawCopy();
     rebinned_gen->DrawCopy("same");
     rebinned_rec->Write();
@@ -736,8 +740,8 @@ TCanvas * make_canvas (TH1 * h_gen,
         unfolded_spectrum->DrawCopy("same");
         unfolded_spectrum->Write();
     }
-    c->GetPad(2)->GetPad(2)->BuildLegend(0.3, 0.3, 0.5, 0.6);
     draw_turnon_line(turnon, rebinned_rec->GetYaxis()->GetXmin(), rebinned_rec->GetYaxis()->GetXmax());
+    c->GetPad(2)->GetPad(2)->BuildLegend(0.7,0.4,0.9,0.9);
     c->GetPad(2)->GetPad(2)->RedrawAxis();
     // TPaveText (Double_t x1, Double_t y1, Double_t x2, Double_t y2, Option_t *option="br")
     TPaveText * spectrum_text = new TPaveText(0.7,0.2,0.89,0.3, "NBNDC");
@@ -745,6 +749,13 @@ TCanvas * make_canvas (TH1 * h_gen,
     spectrum_text->SetTextFont(42);
     spectrum_text->AddText(true_xsec);
     spectrum_text->Draw();
+    // TPaveText (Double_t x1, Double_t y1, Double_t x2, Double_t y2, Option_t *option="br") 
+    TPaveText * trigger_text  = new TPaveText(0.2, 0.2, 0.4, 0.6, "NBNDC");
+    trigger_text->SetFillColorAlpha(0,0);
+    trigger_text->SetTextFont(42);
+    for (const TString& line: pave_trigger)
+        trigger_text->AddText(line);
+    trigger_text->Draw();
 
     cout << "=== Plotting ratios of unfolded spectra to truth" << endl;
     c->cd(4);
@@ -769,16 +780,10 @@ TCanvas * make_canvas (TH1 * h_gen,
         ratio->GetYaxis()->SetRangeUser(0,2);
         ratio->DrawCopy();
         ratio->Write();
-        draw_turnon_line(turnon, ratio->GetYaxis()->GetXmin(), ratio->GetYaxis()->GetXmax());
+        draw_turnon_line(turnon, 0, 2);
         delete ratio;
     }
 
-    //delete rebinned_gen;
-    //delete rebinned_rec;
-    //delete rebinned_RM;
-    //delete h_resolution;
-    //delete miss_and_fake.first ;
-    //delete miss_and_fake.second;
     for (auto& unfolded_spectrum: unfolded_spectra)
         delete unfolded_spectrum;
 

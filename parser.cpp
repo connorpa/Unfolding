@@ -114,7 +114,7 @@ vector<TF1 *> get_functions (string s, double (* f)(double *, double *), double 
         replace(expression.begin(), expression.end(), ',', '_');
         functions.push_back(new TF1 (expression.c_str(), f, xmin, xmax, parameters.size()));
         for (unsigned short iparam = 0 ; iparam < parameters.size() ; iparam++)
-            functions.back()->SetParameter(iparam, parameters[iparam]);
+            functions.back()->SetParameter(iparam+1, parameters[iparam]);
     }
     return functions;
 }
@@ -396,17 +396,17 @@ int main (int argc, char * argv[])
                             string dir_binning_name = "binning_" + to_string(minS) + '_' + to_string(minP);
                             TDirectory * dir_binning = dir_sampling->mkdir(dir_binning_name.c_str());
                             dir_binning->cd();
-                            vector<TString> pave_ABPS = {TString::Format("minS=%f", minS),
-                                                         TString::Format("minP=%f", minP),
-                                                         TString::Format("a=%f", eff_a),
-                                                         TString::Format("#mu=%f", eff_mu),
-                                                         TString::Format("#sigma=%f", eff_sigma),
-                                                         TString::Format("turn-on=%f", turnon)},
-                                            pave_resolution = {TString::Format("#sigma=%f+#frac{%f}{p_{T}^{%f}+%f*p_{T}}+%f*p_{T}", res_sigma->GetParameter(1), res_sigma->GetParameter(2), res_sigma->GetParameter(3), res_sigma->GetParameter(4), res_sigma->GetParameter(5))};
+                            vector<TString> pave_ABPS = {TString::Format("minS=%.2f", minS),
+                                                         TString::Format("minP=%.2f", minP)},
+                                            pave_trigger = {TString::Format("a=%.2f", eff_a),
+                                                            TString::Format("#mu=%.2f", eff_mu),
+                                                            TString::Format("#sigma=%.2f", eff_sigma),
+                                                            TString::Format("turn-on=%.2f", turnon)},
+                                            pave_resolution = {TString::Format("#sigma=%.2f+#frac{%.2f}{p_{T}^{%.2f}+%.2f*p_{T}}+%.2f*p_{T}", res_sigma->GetParameter(1), res_sigma->GetParameter(2), res_sigma->GetParameter(3), res_sigma->GetParameter(4), res_sigma->GetParameter(5))};
                             try
                             {
                                 vector<double> new_edges = find_binning(h_RM, minS, minP);
-                                c = make_canvas(h_gen, h_rec, h_RM, h_resolution, new_edges, truth->GetTitle(), model->GetTitle(), v_parameters, pave_resolution, pave_ABPS, turnon); // writing is done inside of the function
+                                c = make_canvas(h_gen, h_rec, h_RM, h_resolution, new_edges, truth->GetTitle(), model->GetTitle(), v_parameters, pave_resolution, pave_ABPS, pave_trigger, turnon); // writing is done inside of the function
                             }
                             catch (TString s)
                             {

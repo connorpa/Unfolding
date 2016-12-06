@@ -47,6 +47,6 @@ std::vector<double> find_binning (TH2 *, float, float);
 std::vector<TH1 *> make_unfolding (TH2 *, TH1 *, TH2 *, TH1 *);
 std::pair<TH1 *, TH1 *> make_miss_fake (TH2 *, TH1 *, TH1 *);
 std::vector<TH1 *> make_ABPS (TH2 *);
-TCanvas * make_canvas (TH1 *,  TH1 *, TH2 *, TH2 *, std::vector<double>, TString, TString, std::vector<UnfoldingParameters *>, std::vector<TString>, std::vector<TString>, double turnon);
+TCanvas * make_canvas (TH1 *,  TH1 *, TH2 *, TH2 *, std::vector<double>, TString, TString, std::vector<UnfoldingParameters *>, std::vector<TString>, std::vector<TString>, std::vector<TString>, double turnon);
 
 #endif
