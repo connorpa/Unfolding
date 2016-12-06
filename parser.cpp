@@ -328,74 +328,81 @@ int main (int argc, char * argv[])
             f_output = new TFile (rootfilename.c_str(), "RECREATE");
             
             double xmin = binning.front(), xmax = binning.back();
-            // looping over efficiency parameters
-            for (const double& eff_a: v_eff_a) for (const double& eff_mu: v_eff_mu) for (const double& eff_sigma: v_eff_sigma)
+            // loop over the resolution parameters
+            for (const double res_N: v_res_N) for (const double res_mu: v_res_mu) for (TF1 * res_sigma: v_res_sigma) for (const double res_tau: v_res_tau) for (const double res_kL: v_res_kL) for (const double res_kR: v_res_kR) for (const double res_aL: v_res_aL) for (const double res_nL: v_res_nL) for (const double res_aR: v_res_aR) for (const double res_nR: v_res_nR)
             {
-                cout << "-- efficiency parameters:" << eff_a << '\t' << eff_mu << '\t' << eff_sigma << endl;
+                cout << "-- resolution parameters:" << res_N << '\t' << res_mu << '\t' << res_sigma->Eval((xmax-xmin)/2) << '\t' << res_tau << '\t'
+                                                    << res_kR << '\t' << res_kL << '\t' << res_aL << '\t' << res_nL << '\t' << res_aR << '\t' << res_nR << endl;
 
                 // define new directory
-                string dir_efficiency_name = "efficiency_" + to_string(eff_a) + '_' + to_string(eff_mu) + '_' + to_string(eff_sigma);
-                replace(dir_efficiency_name.begin(), dir_efficiency_name.end(), '.', '_');
-                TDirectory * dir_efficiency = f_output->mkdir(dir_efficiency_name.c_str());
-                dir_efficiency->cd();
+                string dir_resolution_name = "resolution_" + to_string(res_N) + '_' + to_string(res_mu) + '_' + string(res_sigma->GetName()) + '_' + to_string(res_tau) + "__" + to_string(res_kL) + '_' + to_string(res_kR) + "__" + to_string(res_aL) + '_' + to_string(res_nL) + '_' + to_string(res_aR) + '_' + to_string(res_nR);
+                TDirectory * dir_resolution = f_output->mkdir(dir_resolution_name.c_str());
+                dir_resolution->cd();
 
-                // define and save efficiency function
-                TF1 * f_efficiency = new TF1 ("efficiency", Efficiency, xmin, xmax, NEFFICIENCY_PARAMETERS);
-                f_efficiency->SetParameters(eff_a, eff_mu, eff_sigma);
-                f_efficiency->Write();
-                
-                // determine turn-on point
-                unsigned iturnon = binning.front();
-                while (iturnon < binning.size() && f_efficiency->Eval(binning[iturnon]) < 0.99) iturnon++;
-                double turnon = binning[iturnon];
+                // define and save resolution from parameters
+                TF1 * f_resolution = new TF1 ("resolution", Resolution, -1, 1, NRESOLUTION_PARAMETERS);
+                f_resolution->SetParameters(res_N, res_mu, res_sigma->Eval((xmax-xmin)/2), res_tau, res_kL, res_kR, res_aL, res_nL, res_aR, res_nR);
+                f_resolution->Write();
 
-                // loop over the resolution parameters
-                for (const double res_N: v_res_N) for (const double res_mu: v_res_mu) for (TF1 * res_sigma: v_res_sigma) for (const double res_tau: v_res_tau) for (const double res_kL: v_res_kL) for (const double res_kR: v_res_kR) for (const double res_aL: v_res_aL) for (const double res_nL: v_res_nL) for (const double res_aR: v_res_aR) for (const double res_nR: v_res_nR)
+                // save parameter functions (if applicable)
+                res_sigma->Write();
+
+                // make and save measurement with default binning
+                TH1D * h_gen = new TH1D ("gen", "Truth"      , binning.size()-1, &binning[0]),
+                     * h_rec = new TH1D ("rec", "Measurement", binning.size()-1, &binning[0]);
+                make_measurement(h_gen, h_rec, truth, /*f_efficiency,*/ xmin, xmax, f_resolution, res_sigma, truth_nevents);
+                h_gen->Write();
+                h_rec->Write();
+
+                // loop on sampling methods 
+                for (const string& sampling: v_sampling)
                 {
-                    cout << "-- resolution parameters:" << res_N << '\t' << res_mu << '\t' << res_sigma->Eval((xmax-xmin)/2) << '\t' << res_tau << '\t'
-                                                        << res_kR << '\t' << res_kL << '\t' << res_aL << '\t' << res_nL << '\t' << res_aR << '\t' << res_nR << endl;
+                    cout << "-- sampling method: " << sampling << endl;
+                    TDirectory * dir_sampling = dir_resolution->mkdir(sampling.c_str());
+                    dir_sampling->cd();
 
-                    // define new directory
-                    string dir_resolution_name = "resolution_" + to_string(res_N) + '_' + to_string(res_mu) + '_' + string(res_sigma->GetName()) + '_' + to_string(res_tau) + "__" + to_string(res_kL) + '_' + to_string(res_kR) + "__" + to_string(res_aL) + '_' + to_string(res_nL) + '_' + to_string(res_aR) + '_' + to_string(res_nR);
-                    TDirectory * dir_resolution = dir_efficiency->mkdir(dir_resolution_name.c_str());
-                    dir_resolution->cd();
+                    // generate and save RM and differential resolution
+                    TH2 * h_RM = new TH2D ("RM", "RM", binning.size()-1, &binning[0], binning.size()-1, &binning[0]),
+                        * h_resolution = new TH2D("resolution", "resolution", 41, -1, 1, binning.size()-1, &binning[0]);
+                    make_RM(h_RM, h_resolution, model, xmin, xmax, f_resolution, res_sigma, model_nevents, sampling.c_str());
+                    h_RM->Write();
+                    h_resolution->Write();
 
-                    // define and save resolution from parameters
-                    TF1 * f_resolution = new TF1 ("resolution", Resolution, -1, 1, NRESOLUTION_PARAMETERS);
-                    f_resolution->SetParameters(res_N, res_mu, res_sigma->Eval((xmax-xmin)/2), res_tau, res_kL, res_kR, res_aL, res_nL, res_aR, res_nR);
-                    f_resolution->Write();
-
-                    // save parameter functions (if applicable)
-                    res_sigma->Write();
-
-                    // make and save measurement with default binning
-                    TH1D * h_gen = new TH1D ("gen", "Truth"      , binning.size()-1, &binning[0]),
-                         * h_rec = new TH1D ("rec", "Measurement", binning.size()-1, &binning[0]);
-                    make_measurement(h_gen, h_rec, truth, f_efficiency, xmin, xmax, f_resolution, res_sigma, truth_nevents);
-                    h_gen->Write();
-                    h_rec->Write();
-
-                    // loop on sampling methods 
-                    for (const string& sampling: v_sampling)
+                    // loop on conditions on the binning
+                    for (const double& minS: v_minS) for (const double& minP: v_minP)
                     {
-                        cout << "-- sampling method: " << sampling << endl;
-                        TDirectory * dir_sampling = dir_resolution->mkdir(sampling.c_str());
-                        dir_sampling->cd();
+                        cout << "-- requirement on binning: " << minS << '\t' << minP << endl;
+                        string dir_binning_name = "binning_" + to_string(minS) + '_' + to_string(minP);
+                        TDirectory * dir_binning = dir_sampling->mkdir(dir_binning_name.c_str());
+                        dir_binning->cd();
 
-                        // generate and save RM and differential resolution
-                        TH2 * h_RM = new TH2D ("RM", "RM", binning.size()-1, &binning[0], binning.size()-1, &binning[0]),
-                            * h_resolution = new TH2D("resolution", "resolution", 41, -1, 1, binning.size()-1, &binning[0]);
-                        make_RM(h_RM, h_resolution, model, xmin, xmax, f_resolution, res_sigma, model_nevents, sampling.c_str());
-                        h_RM->Write();
-                        h_resolution->Write();
-
-                        // loop on conditions on the binning
-                        for (const double& minS: v_minS) for (const double& minP: v_minP)
+                        // looping over efficiency parameters
+                        for (const double& eff_a: v_eff_a) for (const double& eff_mu: v_eff_mu) for (const double& eff_sigma: v_eff_sigma)
                         {
-                            cout << "-- requirement on binning: " << minS << '\t' << minP << endl;
-                            string dir_binning_name = "binning_" + to_string(minS) + '_' + to_string(minP);
-                            TDirectory * dir_binning = dir_sampling->mkdir(dir_binning_name.c_str());
-                            dir_binning->cd();
+                            cout << "-- efficiency parameters:" << eff_a << '\t' << eff_mu << '\t' << eff_sigma << endl;
+
+                            // define new directory
+                            string dir_efficiency_name = "efficiency_" + to_string(eff_a) + '_' + to_string(eff_mu) + '_' + to_string(eff_sigma);
+                            replace(dir_efficiency_name.begin(), dir_efficiency_name.end(), '.', '_');
+                            TDirectory * dir_efficiency = dir_binning->mkdir(dir_efficiency_name.c_str());
+                            dir_efficiency->cd();
+
+                            // define and save efficiency function
+                            TF1 * f_efficiency = new TF1 ("efficiency", Efficiency, xmin, xmax, NEFFICIENCY_PARAMETERS);
+                            f_efficiency->SetParameters(eff_a, eff_mu, eff_sigma);
+                            f_efficiency->Write();
+                            
+                            // determine turn-on point
+                            unsigned iturnon = binning.front();
+                            while (iturnon < binning.size() && f_efficiency->Eval(binning[iturnon]) < 0.99) iturnon++;
+                            double turnon = binning[iturnon];
+
+                            string new_name = dir_efficiency_name;
+                            new_name.replace(new_name.find("efficiency"), 10, h_rec->GetName());
+                            TH1 * h_rec_after_trigger = static_cast<TH1 *>(h_rec->Clone(new_name.c_str()));
+                            h_rec_after_trigger->Multiply(f_efficiency);
+
+                            // parameter information
                             vector<TString> pave_ABPS = {TString::Format("minS=%.2f", minS),
                                                          TString::Format("minP=%.2f", minP)},
                                             pave_trigger = {TString::Format("a=%.2f", eff_a),
@@ -406,7 +413,7 @@ int main (int argc, char * argv[])
                             try
                             {
                                 vector<double> new_edges = find_binning(h_RM, minS, minP);
-                                c = make_canvas(h_gen, h_rec, h_RM, h_resolution, new_edges, truth->GetTitle(), model->GetTitle(), v_parameters, pave_resolution, pave_ABPS, pave_trigger, turnon); // writing is done inside of the function
+                                c = make_canvas(h_gen, h_rec_after_trigger, h_RM, h_resolution, new_edges, truth->GetTitle(), model->GetTitle(), v_parameters, pave_resolution, pave_ABPS, pave_trigger, turnon); // writing is done inside of the function
                             }
                             catch (TString s)
                             {
@@ -419,17 +426,17 @@ int main (int argc, char * argv[])
                             const string current_title = "Title:" + sampling;
                             c->Print(filename.c_str(), current_title.c_str());
                             c->Write();
-                            dir_sampling->cd();
-                            dir_binning->Close();
+                            dir_binning->cd();
+                            dir_efficiency->Close();
                         }
-                        dir_resolution->cd();
-                        dir_sampling->Close();
+                        dir_sampling->cd();
+                        dir_binning->Close();
                     }
-                    dir_efficiency->cd();
-                    dir_resolution->Close();
+                    dir_resolution->cd();
+                    dir_sampling->Close();
                 }
                 f_output->cd();
-                dir_efficiency->Close();
+                dir_resolution->Close();
             } // end of loop over parameters
 
             // TODO: measure computation time

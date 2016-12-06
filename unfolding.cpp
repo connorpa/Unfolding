@@ -193,7 +193,7 @@ void make_RM (TH2 * h_RM,
 void make_measurement (TH1 * h_gen,
                        TH1 * h_rec,
                        TF1 * xsec,
-                       TF1 * f_efficiency,
+                       //TF1 * f_efficiency,
                        double minpt,
                        double maxpt,
                        TF1 * f_resolution,
@@ -220,7 +220,7 @@ void make_measurement (TH1 * h_gen,
             x = f_resolution->GetRandom(minresolution, maxresolution);
         }
         pt_rec = pt_gen*(1-x);
-        weight *= f_efficiency->Eval(pt_rec);
+        //weight *= f_efficiency->Eval(pt_rec);
         //cout << pt_rec << '\t' << f_efficiency->Eval(pt_rec) << endl;
         h_rec->Fill(pt_rec, weight);
     }

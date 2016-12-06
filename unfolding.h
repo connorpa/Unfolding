@@ -42,7 +42,7 @@ double Efficiency (double *, double *);
 double Sigma      (double *, double *);
 
 void make_RM (TH2 *, TH2 *, TF1 *, double, double, TF1 *, TF1 *, unsigned long, TString);
-void make_measurement (TH1 *, TH1 *, TF1 *, TF1 *, double, double, TF1 *, TF1 *, unsigned long); 
+void make_measurement (TH1 *, TH1 *, TF1 *, /*TF1 *,*/ double, double, TF1 *, TF1 *, unsigned long); 
 std::vector<double> find_binning (TH2 *, float, float);
 std::vector<TH1 *> make_unfolding (TH2 *, TH1 *, TH2 *, TH1 *);
 std::pair<TH1 *, TH1 *> make_miss_fake (TH2 *, TH1 *, TH1 *);
