@@ -400,7 +400,7 @@ int main (int argc, char * argv[])
                             string new_name = dir_efficiency_name;
                             new_name.replace(new_name.find("efficiency"), 10, h_rec->GetName());
                             TH1 * h_rec_after_trigger = static_cast<TH1 *>(h_rec->Clone(new_name.c_str()));
-                            h_rec_after_trigger->Multiply(f_efficiency);
+                            if (eff_sigma > 0) h_rec_after_trigger->Multiply(f_efficiency);
 
                             // parameter information
                             vector<TString> pave_ABPS = {TString::Format("minS=%.2f", minS),
