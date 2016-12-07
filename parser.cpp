@@ -394,7 +394,8 @@ int main (int argc, char * argv[])
                             
                             // determine turn-on point
                             unsigned iturnon = binning.front();
-                            while (iturnon < binning.size() && f_efficiency->Eval(binning[iturnon]) < 0.99) iturnon++;
+                            if (eff_sigma > 0)
+                                while (iturnon < binning.size() && f_efficiency->Eval(binning[iturnon]) < 0.99) iturnon++;
                             double turnon = binning[iturnon];
 
                             string new_name = dir_efficiency_name;
@@ -409,11 +410,11 @@ int main (int argc, char * argv[])
                                                             TString::Format("#mu=%.2f", eff_mu),
                                                             TString::Format("#sigma=%.2f", eff_sigma),
                                                             TString::Format("turn-on=%.2f", turnon)},
-                                            pave_resolution = {TString::Format("#sigma=%.2f+#frac{%.2f}{p_{T}^{%.2f}+%.2f*p_{T}}+%.2f*p_{T}", res_sigma->GetParameter(1), res_sigma->GetParameter(2), res_sigma->GetParameter(3), res_sigma->GetParameter(4), res_sigma->GetParameter(5))};
+                                            pave_resolution = {TString::Format("#sigma=%.3f+#frac{%.3f}{p_{T}^{%.3f}+%.3f*p_{T}}+%.3f*p_{T}", res_sigma->GetParameter(1), res_sigma->GetParameter(3), res_sigma->GetParameter(3), res_sigma->GetParameter(4), res_sigma->GetParameter(5))};
                             try
                             {
                                 vector<double> new_edges = find_binning(h_RM, minS, minP);
-                                c = make_canvas(h_gen, h_rec_after_trigger, h_RM, h_resolution, new_edges, truth->GetTitle(), model->GetTitle(), v_parameters, pave_resolution, pave_ABPS, pave_trigger, turnon); // writing is done inside of the function
+                                c = make_canvas(h_gen, h_rec_after_trigger, h_RM, h_resolution, new_edges, truth->GetTitle(), model->GetTitle(), v_parameters, sampling.c_str(), pave_resolution, pave_ABPS, pave_trigger, turnon); // writing is done inside of the function
                             }
                             catch (TString s)
                             {

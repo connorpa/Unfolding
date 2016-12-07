@@ -122,8 +122,10 @@ void make_RM (TH2 * h_RM,
                         f_resolution->SetParameter(2, f_sigma->Eval(pt_gen));
                         double x = (pt_gen-pt_rec)/pt_gen,
                                resolution = f_resolution->Eval(x);
-                        h_RM->SetBinContent(xbin, ybin, h_RM->GetBinContent(xbin, ybin) + current_xsec*resolution/(xbinwidth*ybinwidth));
-                        h_resolution->SetBinContent(h_resolution->GetXaxis()->FindBin(x), xbin, h_resolution->GetBinContent(h_resolution->GetXaxis()->FindBin(x), xbin) + current_xsec*resolution/(xbinwidth*ybinwidth));
+                        double value = current_xsec*resolution/(xbinwidth*ybinwidth);
+                        h_RM->SetBinContent(xbin, ybin, h_RM->GetBinContent(xbin, ybin) + value);
+                        h_resolution->SetBinContent(                h_resolution->GetXaxis()->FindBin(x), ybin,
+                                        h_resolution->GetBinContent(h_resolution->GetXaxis()->FindBin(x), ybin) + value);
                     }
                 }
             }
@@ -628,6 +630,7 @@ TCanvas * make_canvas (TH1 * h_gen,
                        TString true_xsec,
                        TString MC_xsec,
                        vector<UnfoldingParameters *> v_parameters,
+                       TString sampling,
                        vector<TString> pave_res_parameters,
                        vector<TString> pave_ABPS,
                        vector<TString> pave_trigger,
@@ -664,6 +667,11 @@ TCanvas * make_canvas (TH1 * h_gen,
     RM_text->SetFillColorAlpha(0,0);
     RM_text->AddText(MC_xsec);
     RM_text->Draw();
+    TPaveText * RM_text2 = new TPaveText(0.7,0.7,0.89,0.8, "NBNDC");
+    RM_text2->SetTextFont(42);
+    RM_text2->SetFillColorAlpha(0,0);
+    RM_text2->AddText(sampling);
+    RM_text2->Draw();
 
     cout << "=== Plotting resolution" << endl;
     c->cd(3);

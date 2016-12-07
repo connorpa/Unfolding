@@ -1,4 +1,4 @@
 #ifndef __SPECTRUM_HEADER__
 #define __SPECTRUM_HEADER__
-#define NTERMS 10
+#define NTERMS 12
 #endif
