@@ -399,7 +399,7 @@ int main (int argc, char * argv[])
                             f_efficiency->Write();
                             
                             // determine turn-on point
-                            unsigned iturnon = binning.front();
+                            unsigned iturnon = 0;
                             if (eff_sigma > 0)
                                 while (iturnon < binning.size() && f_efficiency->Eval(binning[iturnon]) < 0.99) iturnon++;
                             double turnon = binning[iturnon];
