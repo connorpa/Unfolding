@@ -667,7 +667,7 @@ TCanvas * make_canvas (TH1 * h_gen,
     RM_text->SetFillColorAlpha(0,0);
     RM_text->AddText(MC_xsec);
     RM_text->Draw();
-    TPaveText * RM_text2 = new TPaveText(0.7,0.7,0.89,0.8, "NBNDC");
+    TPaveText * RM_text2 = new TPaveText(0.2,0.7,0.49,0.8, "NBNDC");
     RM_text2->SetTextFont(42);
     RM_text2->SetFillColorAlpha(0,0);
     RM_text2->AddText(sampling);
@@ -752,7 +752,7 @@ TCanvas * make_canvas (TH1 * h_gen,
     c->GetPad(2)->GetPad(2)->BuildLegend(0.7,0.4,0.9,0.9);
     c->GetPad(2)->GetPad(2)->RedrawAxis();
     // TPaveText (Double_t x1, Double_t y1, Double_t x2, Double_t y2, Option_t *option="br")
-    TPaveText * spectrum_text = new TPaveText(0.7,0.2,0.89,0.3, "NBNDC");
+    TPaveText * spectrum_text = new TPaveText(0.45,0.2,0.65,0.3, "NBNDC");
     spectrum_text->SetFillColorAlpha(0,0);
     spectrum_text->SetTextFont(42);
     spectrum_text->AddText(true_xsec);
