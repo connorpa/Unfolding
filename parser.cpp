@@ -416,7 +416,7 @@ int main (int argc, char * argv[])
                                                             TString::Format("#mu=%.2f", eff_mu),
                                                             TString::Format("#sigma=%.2f", eff_sigma),
                                                             TString::Format("turn-on=%.2f", turnon)},
-                                            pave_resolution = {TString::Format("#sigma=%.3f+#frac{%.3f}{p_{T}^{%.3f}+%.3f*p_{T}}+%.3f*p_{T}", res_sigma->GetParameter(1), res_sigma->GetParameter(3), res_sigma->GetParameter(3), res_sigma->GetParameter(4), res_sigma->GetParameter(5))};
+                                            pave_resolution = {TString::Format("#sigma=%.3f+#frac{%.3f}{p_{T}^{%.3f}+%.3f*p_{T}}+%.3f*p_{T}", res_sigma->GetParameter(1), res_sigma->GetParameter(2), res_sigma->GetParameter(3), res_sigma->GetParameter(4), res_sigma->GetParameter(5))};
                             try
                             {
                                 vector<double> new_edges = find_binning(h_RM, minS, minP);
