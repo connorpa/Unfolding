@@ -106,6 +106,7 @@ template<typename T> vector<T> get_vector (string s)
 
 vector<TF1 *> get_functions (string s, double (* f)(double *, double *), double xmin, double xmax)
 {
+    cout << "Getting functions with following parameters:";
     vector<string> expressions = get_elements<string>(s, ';');
     vector<TF1 *> functions;
     for (string expression: expressions)
@@ -113,9 +114,14 @@ vector<TF1 *> get_functions (string s, double (* f)(double *, double *), double 
         vector<double> parameters = get_elements<double>(expression, ',');
         replace(expression.begin(), expression.end(), ',', '_');
         functions.push_back(new TF1 (expression.c_str(), f, xmin, xmax, parameters.size()));
+        cout << '\n';
         for (unsigned short iparam = 0 ; iparam < parameters.size() ; iparam++)
+        {
+            cout << '\t' << parameters[iparam];
             functions.back()->SetParameter(iparam+1, parameters[iparam]);
+        }
     }
+    cout << endl;
     return functions;
 }
 
